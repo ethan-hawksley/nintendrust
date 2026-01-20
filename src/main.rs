@@ -4,11 +4,11 @@ use nintendrust::rom::Rom;
 use std::fs;
 
 fn main() {
-    let file_path = "3_Branches.nes";
+    let file_path = "4_TheStack.nes";
     let raw_bytes = match fs::read(file_path) {
         Ok(bytes) => bytes,
         Err(e) => {
-            eprintln!("Cound not read file: {}", e);
+            eprintln!("Could not read file: {}", e);
             return;
         }
     };

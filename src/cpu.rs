@@ -5,6 +5,7 @@ pub struct Cpu {
     a: u8,
     x: u8,
     y: u8,
+    stack_pointer: u8,
     flag_carry: bool,
     flag_zero: bool,
     flag_interrupt_disable: bool,
@@ -21,6 +22,7 @@ impl Cpu {
             a: 0,
             x: 0,
             y: 0,
+            stack_pointer: 0,
             halted: false,
             flag_carry: false,
             flag_overflow: false,
@@ -36,6 +38,20 @@ impl Cpu {
         let pc_high = bus.read(0xFFFD);
         self.program_counter = (pc_high as u16 * 0x100) + pc_low as u16;
         self.flag_interrupt_disable = true;
+        self.stack_pointer = 0xFD
+    }
+
+    fn push(&mut self, bus: &mut Bus, value: u8) {
+        // Store to the stack, and decrement stack pointer
+        bus.write(0x100 + self.stack_pointer as u16, value);
+        self.stack_pointer = self.stack_pointer.wrapping_sub(1);
+    }
+
+    fn pull(&mut self, bus: &mut Bus) -> u8 {
+        // Increment the stack pointer, and read from the stack
+        self.stack_pointer = self.stack_pointer.wrapping_add(1);
+        let value = bus.read(0x100 + self.stack_pointer as u16);
+        value
     }
 
     pub fn emulate_cpu(&mut self, bus: &mut Bus) {
@@ -69,6 +85,17 @@ impl Cpu {
                     cycles = 2;
                 }
             }
+            0x20 => {
+                // JSR
+                let destination_address_low = bus.read(self.program_counter);
+                self.program_counter += 1;
+                let destination_address_high = bus.read(self.program_counter);
+                self.push(bus, (self.program_counter / 256) as u8);
+                self.push(bus, self.program_counter as u8);
+                self.program_counter =
+                    destination_address_high as u16 * 256 + destination_address_low as u16;
+                cycles = 6;
+            }
             0x30 => {
                 // BMI
                 let destination_offset = bus.read(self.program_counter);
@@ -89,6 +116,20 @@ impl Cpu {
                     cycles = 2;
                 }
             }
+            0x4C => {
+                // JMP
+                let destination_address_low = bus.read(self.program_counter);
+                self.program_counter += 1;
+                let destination_address_high = bus.read(self.program_counter);
+                self.program_counter =
+                    destination_address_high as u16 * 256 + destination_address_low as u16;
+                cycles = 3;
+            }
+            0x48 => {
+                // PHA
+                self.push(bus, self.a);
+                cycles = 3;
+            }
             0x50 => {
                 // BVC
                 let destination_offset = bus.read(self.program_counter);
@@ -108,6 +149,21 @@ impl Cpu {
                 } else {
                     cycles = 2;
                 }
+            }
+            0x60 => {
+                // RTS
+                let return_address_low = self.pull(bus);
+                let return_address_high = self.pull(bus);
+                self.program_counter = return_address_high as u16 * 256 + return_address_low as u16;
+                self.program_counter += 1;
+                cycles = 6;
+            }
+            0x68 => {
+                // PLA
+                self.a = self.pull(bus);
+                self.flag_zero = self.a == 0;
+                self.flag_negative = self.a >= 0x80;
+                cycles = 4;
             }
             0x70 => {
                 // BVS
