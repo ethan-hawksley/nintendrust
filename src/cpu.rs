@@ -85,6 +85,11 @@ impl Cpu {
                     cycles = 2;
                 }
             }
+            0x18 => {
+                // CLC
+                self.flag_carry = false;
+                cycles = 2;
+            }
             0x20 => {
                 // JSR
                 let destination_address_low = bus.read(self.program_counter);
@@ -115,6 +120,11 @@ impl Cpu {
                 } else {
                     cycles = 2;
                 }
+            }
+            0x38 => {
+                // SEC
+                self.flag_carry = true;
+                cycles = 2;
             }
             0x4C => {
                 // JMP
@@ -149,6 +159,11 @@ impl Cpu {
                 } else {
                     cycles = 2;
                 }
+            }
+            0x58 => {
+                // CLI
+                self.flag_interrupt_disable = false;
+                cycles = 2;
             }
             0x60 => {
                 // RTS
@@ -185,6 +200,11 @@ impl Cpu {
                     cycles = 2;
                 }
             }
+            0x78 => {
+                // SEI
+                self.flag_interrupt_disable = true;
+                cycles = 2;
+            }
             0x84 => {
                 // STY Zero Page
                 let destination_address = bus.read(self.program_counter);
@@ -205,6 +225,20 @@ impl Cpu {
                 self.program_counter += 1;
                 bus.write(destination_address as u16, self.x);
                 cycles = 3;
+            }
+            0x88 => {
+                // DEY
+                self.y = self.y.wrapping_sub(1);
+                self.flag_zero = self.y == 0;
+                self.flag_negative = self.y > 127;
+                cycles = 2;
+            }
+            0x8A => {
+                // TXA
+                self.a = self.x;
+                self.flag_zero = self.a == 0;
+                self.flag_negative = self.a > 127;
+                cycles = 2;
             }
             0x8C => {
                 // STY Absolute
@@ -262,6 +296,18 @@ impl Cpu {
                     cycles = 2;
                 }
             }
+            0x98 => {
+                // TYA
+                self.a = self.y;
+                self.flag_zero = self.a == 0;
+                self.flag_negative = self.a > 127;
+                cycles = 2;
+            }
+            0x9A => {
+                // TXS
+                self.stack_pointer = self.x;
+                cycles = 2;
+            }
             0xA0 => {
                 // LDY Immediate
                 self.y = bus.read(self.program_counter);
@@ -286,6 +332,20 @@ impl Cpu {
                 self.flag_zero = self.a == 0;
                 self.flag_negative = self.a > 127;
                 cycles = 3;
+            }
+            0xA8 => {
+                // TAY
+                self.y = self.a;
+                self.flag_zero = self.y == 0;
+                self.flag_negative = self.y > 127;
+                cycles = 2;
+            }
+            0xAA => {
+                // TAX
+                self.x = self.a;
+                self.flag_zero = self.x == 0;
+                self.flag_negative = self.x > 127;
+                cycles = 2;
             }
             0xAD => {
                 // LDA Absolute
@@ -327,6 +387,32 @@ impl Cpu {
                     cycles = 2;
                 }
             }
+            0xB8 => {
+                // CLV
+                self.flag_overflow = false;
+                cycles = 2;
+            }
+            0xBA => {
+                // TSX
+                self.x = self.stack_pointer;
+                self.flag_zero = self.x == 0;
+                self.flag_negative = self.x > 127;
+                cycles = 2;
+            }
+            0xCA => {
+                // DEX
+                self.x = self.x.wrapping_sub(1);
+                self.flag_zero = self.x == 0;
+                self.flag_negative = self.x > 127;
+                cycles = 2;
+            }
+            0xC8 => {
+                // INY
+                self.y = self.y.wrapping_add(1);
+                self.flag_zero = self.y == 0;
+                self.flag_negative = self.y > 127;
+                cycles = 2;
+            }
             0xD0 => {
                 // BNE
                 let destination_offset = bus.read(self.program_counter);
@@ -347,6 +433,22 @@ impl Cpu {
                     cycles = 2;
                 }
             }
+            0xD8 => {
+                // CLD
+                self.flag_decimal = false;
+                cycles = 2;
+            }
+            0xEA => {
+                // NOP
+                cycles = 2;
+            }
+            0xE8 => {
+                // INX
+                self.x = self.x.wrapping_add(1);
+                self.flag_zero = self.x == 0;
+                self.flag_negative = self.x > 127;
+                cycles = 2;
+            }
             0xF0 => {
                 // BEQ
                 let destination_offset = bus.read(self.program_counter);
@@ -366,6 +468,11 @@ impl Cpu {
                 } else {
                     cycles = 2;
                 }
+            }
+            0xF8 => {
+                // SED
+                self.flag_decimal = true;
+                cycles = 2;
             }
             _ => {
                 // Unknown opcode
