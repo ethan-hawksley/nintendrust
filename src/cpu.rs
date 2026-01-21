@@ -54,6 +54,26 @@ impl Cpu {
         value
     }
 
+    fn get_status_register(&self, flag_break: bool) -> u8 {
+        (self.flag_carry as u8)
+            | (self.flag_zero as u8) << 1
+            | (self.flag_interrupt_disable as u8) << 2
+            | (self.flag_decimal as u8) << 3
+            | (flag_break as u8) << 4
+            | 1 << 5 // Bit 5 is always set to 1
+            | (self.flag_overflow as u8) << 6
+            | (self.flag_negative as u8) << 7
+    }
+
+    fn set_status_register(&mut self, data: u8) {
+        self.flag_carry = (data & 0x01) != 0;
+        self.flag_zero = (data & 0x02) != 0;
+        self.flag_interrupt_disable = (data & 0x04) != 0;
+        self.flag_decimal = (data & 0x08) != 0;
+        self.flag_overflow = (data & 0x40) != 0;
+        self.flag_negative = (data & 0x80) != 0;
+    }
+
     pub fn emulate_cpu(&mut self, bus: &mut Bus) {
         let opcode = bus.read(self.program_counter);
         println!("0x{:02x}", opcode);
@@ -64,6 +84,12 @@ impl Cpu {
             0x02 => {
                 // HTL
                 self.halted = true;
+            }
+            0x08 => {
+                // PHP
+                let status = self.get_status_register(true);
+                self.push(bus, status);
+                cycles = 3;
             }
             0x10 => {
                 // BPL
@@ -100,6 +126,12 @@ impl Cpu {
                 self.program_counter =
                     destination_address_high as u16 * 256 + destination_address_low as u16;
                 cycles = 6;
+            }
+            0x28 => {
+                // PLP
+                let status = self.pull(bus);
+                self.set_status_register(status);
+                cycles = 3;
             }
             0x30 => {
                 // BMI
