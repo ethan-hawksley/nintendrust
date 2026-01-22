@@ -33,7 +33,7 @@ impl Cpu {
         }
     }
 
-    pub fn reset(&mut self, bus: &mut Bus) {
+    pub fn reset(&mut self, bus: &Bus) {
         let pc_low = bus.read(0xFFFC);
         let pc_high = bus.read(0xFFFD);
         self.program_counter = (pc_high as u16 * 0x100) + pc_low as u16;
@@ -47,7 +47,7 @@ impl Cpu {
         self.stack_pointer = self.stack_pointer.wrapping_sub(1);
     }
 
-    fn pull(&mut self, bus: &mut Bus) -> u8 {
+    fn pull(&mut self, bus: &Bus) -> u8 {
         // Increment the stack pointer, and read from the stack
         self.stack_pointer = self.stack_pointer.wrapping_add(1);
         let value = bus.read(0x100 + self.stack_pointer as u16);
@@ -74,6 +74,20 @@ impl Cpu {
         self.flag_negative = (data & 0x80) != 0;
     }
 
+    fn read_and_increment(&mut self, bus: &Bus) -> u8 {
+        let value = bus.read(self.program_counter);
+        self.program_counter += 1;
+        value
+    }
+
+    fn read_absolute_addressed(&mut self, bus: &Bus) -> u16 {
+        let value_low = bus.read(self.program_counter);
+        self.program_counter += 1;
+        let value_high = bus.read(self.program_counter);
+        self.program_counter += 1;
+        value_high as u16 * 0x100 + value_low as u16
+    }
+
     pub fn emulate_cpu(&mut self, bus: &mut Bus) {
         let opcode = bus.read(self.program_counter);
         println!("0x{:02x}", opcode);
@@ -91,10 +105,17 @@ impl Cpu {
                 self.push(bus, status);
                 cycles = 3;
             }
+            0x0A => {
+                // ASL A
+                self.flag_carry = self.a > 127;
+                self.a <<= 1;
+                self.flag_zero = self.a == 0;
+                self.flag_negative = self.a > 127;
+                cycles = 2;
+            }
             0x10 => {
                 // BPL
-                let destination_offset = bus.read(self.program_counter);
-                self.program_counter += 1;
+                let destination_offset = self.read_and_increment(bus);
                 if !self.flag_negative {
                     let mut signed_offset = destination_offset as i16;
                     if signed_offset > 127 {
@@ -135,8 +156,7 @@ impl Cpu {
             }
             0x30 => {
                 // BMI
-                let destination_offset = bus.read(self.program_counter);
-                self.program_counter += 1;
+                let destination_offset = self.read_and_increment(bus);
                 if self.flag_negative {
                     let mut signed_offset = destination_offset as i16;
                     if signed_offset > 127 {
@@ -160,11 +180,7 @@ impl Cpu {
             }
             0x4C => {
                 // JMP
-                let destination_address_low = bus.read(self.program_counter);
-                self.program_counter += 1;
-                let destination_address_high = bus.read(self.program_counter);
-                self.program_counter =
-                    destination_address_high as u16 * 256 + destination_address_low as u16;
+                self.program_counter = self.read_absolute_addressed(bus);
                 cycles = 3;
             }
             0x48 => {
@@ -174,8 +190,7 @@ impl Cpu {
             }
             0x50 => {
                 // BVC
-                let destination_offset = bus.read(self.program_counter);
-                self.program_counter += 1;
+                let destination_offset = self.read_and_increment(bus);
                 if !self.flag_overflow {
                     let mut signed_offset = destination_offset as i16;
                     if signed_offset > 127 {
@@ -214,8 +229,7 @@ impl Cpu {
             }
             0x70 => {
                 // BVS
-                let destination_offset = bus.read(self.program_counter);
-                self.program_counter += 1;
+                let destination_offset = self.read_and_increment(bus);
                 if self.flag_overflow {
                     let mut signed_offset = destination_offset as i16;
                     if signed_offset > 127 {
@@ -239,22 +253,19 @@ impl Cpu {
             }
             0x84 => {
                 // STY Zero Page
-                let destination_address = bus.read(self.program_counter);
-                self.program_counter += 1;
+                let destination_address = self.read_and_increment(bus);
                 bus.write(destination_address as u16, self.y);
                 cycles = 3;
             }
             0x85 => {
                 // STA Zero Page
-                let destination_address = bus.read(self.program_counter);
-                self.program_counter += 1;
+                let destination_address = self.read_and_increment(bus);
                 bus.write(destination_address as u16, self.a);
                 cycles = 3;
             }
             0x86 => {
                 // STX Zero Page
-                let destination_address = bus.read(self.program_counter);
-                self.program_counter += 1;
+                let destination_address = self.read_and_increment(bus);
                 bus.write(destination_address as u16, self.x);
                 cycles = 3;
             }
@@ -274,44 +285,34 @@ impl Cpu {
             }
             0x8C => {
                 // STY Absolute
-                let destination_address_low = bus.read(self.program_counter);
-                self.program_counter += 1;
-                let destination_address_high = bus.read(self.program_counter);
-                self.program_counter += 1;
+                let destination_address = self.read_absolute_addressed(bus);
                 bus.write(
-                    destination_address_high as u16 * 0x100 + destination_address_low as u16,
+                    destination_address,
                     self.y,
                 );
                 cycles = 4;
             }
             0x8D => {
                 // STA Absolute
-                let destination_address_low = bus.read(self.program_counter);
-                self.program_counter += 1;
-                let destination_address_high = bus.read(self.program_counter);
-                self.program_counter += 1;
+                let destination_address = self.read_absolute_addressed(bus);
                 bus.write(
-                    destination_address_high as u16 * 0x100 + destination_address_low as u16,
+                    destination_address,
                     self.a,
                 );
                 cycles = 4;
             }
             0x8E => {
                 // STX Absolute
-                let destination_address_low = bus.read(self.program_counter);
-                self.program_counter += 1;
-                let destination_address_high = bus.read(self.program_counter);
-                self.program_counter += 1;
+                let destination_address = self.read_absolute_addressed(bus);
                 bus.write(
-                    destination_address_high as u16 * 0x100 + destination_address_low as u16,
+                    destination_address,
                     self.x,
                 );
                 cycles = 4;
             }
             0x90 => {
                 // BCC
-                let destination_offset = bus.read(self.program_counter);
-                self.program_counter += 1;
+                let destination_offset = self.read_and_increment(bus);
                 if !self.flag_carry {
                     let mut signed_offset = destination_offset as i16;
                     if signed_offset > 127 {
@@ -342,24 +343,21 @@ impl Cpu {
             }
             0xA0 => {
                 // LDY Immediate
-                self.y = bus.read(self.program_counter);
-                self.program_counter += 1;
+                self.y = self.read_and_increment(bus);
                 self.flag_zero = self.y == 0;
                 self.flag_negative = self.y > 127;
                 cycles = 2;
             }
             0xA2 => {
                 // LDX Immediate
-                self.x = bus.read(self.program_counter);
-                self.program_counter += 1;
+                self.x = self.read_and_increment(bus);
                 self.flag_zero = self.x == 0;
                 self.flag_negative = self.x > 127;
                 cycles = 2;
             }
             0xA5 => {
                 // LDA Zero Page
-                let destination_address = bus.read(self.program_counter);
-                self.program_counter += 1;
+                let destination_address = self.read_and_increment(bus);
                 self.a = bus.read(destination_address as u16);
                 self.flag_zero = self.a == 0;
                 self.flag_negative = self.a > 127;
@@ -381,28 +379,23 @@ impl Cpu {
             }
             0xAD => {
                 // LDA Absolute
-                let destination_address_low = bus.read(self.program_counter);
-                self.program_counter += 1;
-                let destination_address_high = bus.read(self.program_counter);
-                self.program_counter += 1;
+                let destination_address = self.read_absolute_addressed(bus);
                 self.a = bus
-                    .read(destination_address_high as u16 * 0x100 + destination_address_low as u16);
+                    .read(destination_address);
                 self.flag_zero = self.a == 0;
                 self.flag_negative = self.a > 127;
                 cycles = 4;
             }
             0xA9 => {
                 // LDA Immediate
-                self.a = bus.read(self.program_counter);
-                self.program_counter += 1;
+                self.a = self.read_and_increment(bus);
                 self.flag_zero = self.a == 0;
                 self.flag_negative = self.a > 127;
                 cycles = 2;
             }
             0xB0 => {
                 // BCS
-                let destination_offset = bus.read(self.program_counter);
-                self.program_counter += 1;
+                let destination_offset = self.read_and_increment(bus);
                 if self.flag_carry {
                     let mut signed_offset = destination_offset as i16;
                     if signed_offset > 127 {
@@ -447,8 +440,7 @@ impl Cpu {
             }
             0xD0 => {
                 // BNE
-                let destination_offset = bus.read(self.program_counter);
-                self.program_counter += 1;
+                let destination_offset = self.read_and_increment(bus);
                 if !self.flag_zero {
                     let mut signed_offset = destination_offset as i16;
                     if signed_offset > 127 {
@@ -483,8 +475,7 @@ impl Cpu {
             }
             0xF0 => {
                 // BEQ
-                let destination_offset = bus.read(self.program_counter);
-                self.program_counter += 1;
+                let destination_offset = self.read_and_increment(bus);
                 if self.flag_zero {
                     let mut signed_offset = destination_offset as i16;
                     if signed_offset > 127 {
