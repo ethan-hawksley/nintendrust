@@ -155,6 +155,20 @@ impl Cpu {
         self.flag_negative = self.a & 0x80 != 0;
     }
 
+    fn bitwise_and(&mut self, bus: &mut Bus, address: u16) {
+        let value = bus.read(address);
+        self.a &= value;
+        self.flag_zero = self.a == 0;
+        self.flag_negative = self.a & 0x80 != 0;
+    }
+
+    fn bitwise_eor(&mut self, bus: &mut Bus, address: u16) {
+        let value = bus.read(address);
+        self.a ^= value;
+        self.flag_zero = self.a == 0;
+        self.flag_negative = self.a & 0x80 != 0;
+    }
+
     pub fn emulate_cpu(&mut self, bus: &mut Bus) {
         let opcode = bus.read(self.program_counter);
         println!("0x{:02x}", opcode);
@@ -247,6 +261,12 @@ impl Cpu {
                     destination_address_high as u16 * 256 + destination_address_low as u16;
                 cycles = 6;
             }
+            0x25 => {
+                // AND Zero Page
+                let address = self.read_and_increment(bus);
+                self.bitwise_and(bus, address as u16);
+                cycles = 3;
+            }
             0x26 => {
                 // ROL Zero Page
                 let address = self.read_and_increment(bus);
@@ -259,6 +279,14 @@ impl Cpu {
                 self.set_status_register(status);
                 cycles = 4;
             }
+            0x29 => {
+                // AND Immediate
+                let value = self.read_and_increment(bus);
+                self.a &= value;
+                self.flag_zero = self.a == 0;
+                self.flag_negative = self.a & 0x80 != 0;
+                cycles = 2;
+            }
             0x2A => {
                 // ROL A
                 let old_carry = self.flag_carry;
@@ -270,6 +298,12 @@ impl Cpu {
                 self.flag_zero = self.a == 0;
                 self.flag_negative = self.a & 0x80 != 0;
                 cycles = 2;
+            }
+            0x2D => {
+                // AND Absolute
+                let address = self.read_absolute_addressed(bus);
+                self.bitwise_and(bus, address);
+                cycles = 4;
             }
             0x2E => {
                 // ROL Absolute
@@ -301,6 +335,12 @@ impl Cpu {
                 self.flag_carry = true;
                 cycles = 2;
             }
+            0x45 => {
+                // EOR Zero Page
+                let address = self.read_and_increment(bus);
+                self.bitwise_eor(bus, address as u16);
+                cycles = 3;
+            }
             0x46 => {
                 // LSR Zero Page
                 let address = self.read_and_increment(bus);
@@ -311,6 +351,14 @@ impl Cpu {
                 // PHA
                 self.push(bus, self.a);
                 cycles = 3;
+            }
+            0x49 => {
+                // EOR Immediate
+                let value = self.read_and_increment(bus);
+                self.a ^= value;
+                self.flag_zero = self.a == 0;
+                self.flag_negative = self.a & 0x80 != 0;
+                cycles = 2;
             }
             0x4A => {
                 // LSR A
@@ -323,6 +371,12 @@ impl Cpu {
             0x4C => {
                 // JMP
                 self.program_counter = self.read_absolute_addressed(bus);
+                cycles = 3;
+            }
+            0x4D => {
+                // EOR Absolute
+                let address = self.read_absolute_addressed(bus);
+                self.bitwise_eor(bus, address);
                 cycles = 3;
             }
             0x4E => {
@@ -528,6 +582,13 @@ impl Cpu {
                 self.flag_negative = self.y & 0x80 != 0;
                 cycles = 2;
             }
+            0xA9 => {
+                // LDA Immediate
+                self.a = self.read_and_increment(bus);
+                self.flag_zero = self.a == 0;
+                self.flag_negative = self.a & 0x80 != 0;
+                cycles = 2;
+            }
             0xAA => {
                 // TAX
                 self.x = self.a;
@@ -542,13 +603,6 @@ impl Cpu {
                 self.flag_zero = self.a == 0;
                 self.flag_negative = self.a & 0x80 != 0;
                 cycles = 4;
-            }
-            0xA9 => {
-                // LDA Immediate
-                self.a = self.read_and_increment(bus);
-                self.flag_zero = self.a == 0;
-                self.flag_negative = self.a & 0x80 != 0;
-                cycles = 2;
             }
             0xB0 => {
                 // BCS
