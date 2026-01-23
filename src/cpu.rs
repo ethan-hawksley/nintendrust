@@ -554,12 +554,11 @@ impl Cpu {
                 self.flag_negative = self.x & 0x80 != 0;
                 cycles = 2;
             }
-            0xCA => {
-                // DEX
-                self.x = self.x.wrapping_sub(1);
-                self.flag_zero = self.x == 0;
-                self.flag_negative = self.x & 0x80 != 0;
-                cycles = 2;
+            0xC6 => {
+                // DEC Zero Page
+                let address = self.read_and_increment(bus);
+                self.decrement(bus, address as u16);
+                cycles = 5;
             }
             0xC8 => {
                 // INY
@@ -567,6 +566,19 @@ impl Cpu {
                 self.flag_zero = self.y == 0;
                 self.flag_negative = self.y & 0x80 != 0;
                 cycles = 2;
+            }
+            0xCA => {
+                // DEX
+                self.x = self.x.wrapping_sub(1);
+                self.flag_zero = self.x == 0;
+                self.flag_negative = self.x & 0x80 != 0;
+                cycles = 2;
+            }
+            0xCE => {
+                // DEC Absolute
+                let address = self.read_absolute_addressed(bus);
+                self.decrement(bus, address);
+                cycles = 6;
             }
             0xD0 => {
                 // BNE
@@ -592,9 +604,11 @@ impl Cpu {
                 self.flag_decimal = false;
                 cycles = 2;
             }
-            0xEA => {
-                // NOP
-                cycles = 2;
+            0xE6 => {
+                // INC Zero Page
+                let address = self.read_and_increment(bus);
+                self.increment(bus, address as u16);
+                cycles = 5;
             }
             0xE8 => {
                 // INX
@@ -602,6 +616,16 @@ impl Cpu {
                 self.flag_zero = self.x == 0;
                 self.flag_negative = self.x & 0x80 != 0;
                 cycles = 2;
+            }
+            0xEA => {
+                // NOP
+                cycles = 2;
+            }
+            0xEE => {
+                // INC Absolute
+                let address = self.read_absolute_addressed(bus);
+                self.increment(bus, address);
+                cycles = 6;
             }
             0xF0 => {
                 // BEQ
