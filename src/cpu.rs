@@ -97,6 +97,15 @@ impl Cpu {
         bus.write(address, value);
     }
 
+    fn shift_right(&mut self, bus: &mut Bus, address: u16) {
+        let mut value = bus.read(address);
+        self.flag_carry = value & 1 != 0;
+        value >>= 1;
+        self.flag_zero = value == 0;
+        self.flag_negative = value & 0x80 != 0;
+        bus.write(address, value);
+    }
+
     fn rotate_left(&mut self, bus: &mut Bus, address: u16) {
         let mut value = bus.read(address);
         let old_carry = self.flag_carry;
@@ -105,6 +114,35 @@ impl Cpu {
         if old_carry {
             value |= 1;
         }
+        self.flag_zero = value == 0;
+        self.flag_negative = value & 0x80 != 0;
+        bus.write(address, value);
+    }
+
+    fn rotate_right(&mut self, bus: &mut Bus, address: u16) {
+        let mut value = bus.read(address);
+        let old_carry = self.flag_carry;
+        self.flag_carry = value & 1 != 0;
+        value >>= 1;
+        if old_carry {
+            value |= 0x80;
+        }
+        self.flag_zero = value == 0;
+        self.flag_negative = value & 0x80 != 0;
+        bus.write(address, value);
+    }
+
+    fn increment(&mut self, bus: &mut Bus, address: u16) {
+        let mut value = bus.read(address);
+        value = value.wrapping_add(1);
+        self.flag_zero = value == 0;
+        self.flag_negative = value & 0x80 != 0;
+        bus.write(address, value);
+    }
+
+    fn decrement(&mut self, bus: &mut Bus, address: u16) {
+        let mut value = bus.read(address);
+        value = value.wrapping_sub(1);
         self.flag_zero = value == 0;
         self.flag_negative = value & 0x80 != 0;
         bus.write(address, value);
@@ -209,7 +247,7 @@ impl Cpu {
             0x2E => {
                 // ROL Absolute
                 let address = self.read_absolute_addressed(bus);
-                self.rotate_left(bus, address as u16);
+                self.rotate_left(bus, address);
                 cycles = 6;
             }
             0x30 => {
@@ -236,15 +274,35 @@ impl Cpu {
                 self.flag_carry = true;
                 cycles = 2;
             }
-            0x4C => {
-                // JMP
-                self.program_counter = self.read_absolute_addressed(bus);
-                cycles = 3;
+            0x46 => {
+                // LSR Zero Page
+                let address = self.read_and_increment(bus);
+                self.shift_right(bus, address as u16);
+                cycles = 5;
             }
             0x48 => {
                 // PHA
                 self.push(bus, self.a);
                 cycles = 3;
+            }
+            0x4A => {
+                // LSR A
+                self.flag_carry = self.a & 1 != 0;
+                self.a >>= 1;
+                self.flag_zero = self.a == 0;
+                self.flag_negative = self.a & 0x80 != 0;
+                cycles = 2;
+            }
+            0x4C => {
+                // JMP
+                self.program_counter = self.read_absolute_addressed(bus);
+                cycles = 3;
+            }
+            0x4E => {
+                // LSR Absolute
+                let address = self.read_absolute_addressed(bus);
+                self.shift_right(bus, address);
+                cycles = 6;
             }
             0x50 => {
                 // BVC
@@ -278,12 +336,36 @@ impl Cpu {
                 self.program_counter += 1;
                 cycles = 6;
             }
+            0x66 => {
+                // ROR Zero Page
+                let address = self.read_and_increment(bus);
+                self.rotate_right(bus, address as u16);
+                cycles = 5;
+            }
             0x68 => {
                 // PLA
                 self.a = self.pull(bus);
                 self.flag_zero = self.a == 0;
                 self.flag_negative = self.a >= 0x80;
                 cycles = 4;
+            }
+            0x6A => {
+                // ROR A
+                let old_carry = self.flag_carry;
+                self.flag_carry = self.a & 1 != 0;
+                self.a >>= 1;
+                if old_carry {
+                    self.a |= 0x80;
+                }
+                self.flag_zero = self.a == 0;
+                self.flag_negative = self.a & 0x80 != 0;
+                cycles = 2;
+            }
+            0x6E => {
+                // ROR Absolute
+                let address = self.read_absolute_addressed(bus);
+                self.rotate_right(bus, address);
+                cycles = 6;
             }
             0x70 => {
                 // BVS
