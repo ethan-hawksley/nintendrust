@@ -148,6 +148,13 @@ impl Cpu {
         bus.write(address, value);
     }
 
+    fn bitwise_or(&mut self, bus: &mut Bus, address: u16) {
+        let value = bus.read(address);
+        self.a |= value;
+        self.flag_zero = self.a == 0;
+        self.flag_negative = self.a & 0x80 != 0;
+    }
+
     pub fn emulate_cpu(&mut self, bus: &mut Bus) {
         let opcode = bus.read(self.program_counter);
         println!("0x{:02x}", opcode);
@@ -158,6 +165,12 @@ impl Cpu {
             0x02 => {
                 // HTL
                 self.halted = true;
+            }
+            0x05 => {
+                // ORA Zero Page
+                let address = self.read_and_increment(bus);
+                self.bitwise_or(bus, address as u16);
+                cycles = 3;
             }
             0x06 => {
                 // ASL Zero Page
@@ -171,6 +184,14 @@ impl Cpu {
                 self.push(bus, status);
                 cycles = 3;
             }
+            0x09 => {
+                // ORA Immediate
+                let value = self.read_and_increment(bus);
+                self.a |= value;
+                self.flag_zero = self.a == 0;
+                self.flag_negative = self.a & 0x80 != 0;
+                cycles = 2;
+            }
             0x0A => {
                 // ASL A
                 self.flag_carry = self.a & 0x80 != 0;
@@ -178,6 +199,12 @@ impl Cpu {
                 self.flag_zero = self.a == 0;
                 self.flag_negative = self.a & 0x80 != 0;
                 cycles = 2;
+            }
+            0x0D => {
+                // ORA Absolute
+                let address = self.read_absolute_addressed(bus);
+                self.bitwise_or(bus, address);
+                cycles = 4;
             }
             0x0E => {
                 // ASL Absolute
