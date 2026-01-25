@@ -169,6 +169,24 @@ impl Cpu {
         self.flag_negative = self.a & 0x80 != 0;
     }
 
+    fn add_carry(&mut self, value: u8) {
+        let sum = self.a as u16 + value as u16 + self.flag_carry as u16;
+        self.flag_overflow = (!(self.a ^ value) & (self.a ^ sum as u8) & 0x80) != 0;
+        self.flag_carry = sum > 0xFF;
+        self.a = sum as u8;
+        self.flag_zero = self.a == 0;
+        self.flag_negative = self.a & 0x80 != 0;
+    }
+
+    fn sub_carry(&mut self, value: u8) {
+        let diff = self.a as i16 - value as i16 - (if self.flag_carry { 0 } else { 1 });
+        self.flag_overflow = ((self.a as i16 ^ value as i16) & (self.a as i16 ^ diff) & 0x80) != 0;
+        self.flag_carry = diff >= 0;
+        self.a = diff as u8;
+        self.flag_zero = self.a == 0;
+        self.flag_negative = self.a & 0x80 != 0;
+    }
+
     pub fn emulate_cpu(&mut self, bus: &mut Bus) {
         let opcode = bus.read(self.program_counter);
         println!("0x{:02x}", opcode);
@@ -417,6 +435,13 @@ impl Cpu {
                 self.program_counter += 1;
                 cycles = 6;
             }
+            0x65 => {
+                // ADC Zero Page
+                let address = self.read_and_increment(bus);
+                let value = bus.read(address as u16);
+                self.add_carry(value);
+                cycles = 3;
+            }
             0x66 => {
                 // ROR Zero Page
                 let address = self.read_and_increment(bus);
@@ -430,6 +455,12 @@ impl Cpu {
                 self.flag_negative = self.a >= 0x80;
                 cycles = 4;
             }
+            0x69 => {
+                // ADC Immediate
+                let address = self.read_and_increment(bus);
+                self.add_carry(address);
+                cycles = 2;
+            }
             0x6A => {
                 // ROR A
                 let old_carry = self.flag_carry;
@@ -441,6 +472,13 @@ impl Cpu {
                 self.flag_zero = self.a == 0;
                 self.flag_negative = self.a & 0x80 != 0;
                 cycles = 2;
+            }
+            0x6D => {
+                // ADC Absolute
+                let address = self.read_absolute_addressed(bus);
+                let value = bus.read(address);
+                self.add_carry(value);
+                cycles = 4;
             }
             0x6E => {
                 // ROR Absolute
@@ -685,6 +723,14 @@ impl Cpu {
                 self.flag_decimal = false;
                 cycles = 2;
             }
+
+            0xE5 => {
+                // SBC Zero Page
+                let address = self.read_and_increment(bus);
+                let value = bus.read(address as u16);
+                self.sub_carry(value);
+                cycles = 3;
+            }
             0xE6 => {
                 // INC Zero Page
                 let address = self.read_and_increment(bus);
@@ -698,9 +744,22 @@ impl Cpu {
                 self.flag_negative = self.x & 0x80 != 0;
                 cycles = 2;
             }
+            0xE9 => {
+                // SBC Immediate
+                let value = self.read_and_increment(bus);
+                self.sub_carry(value);
+                cycles = 2;
+            }
             0xEA => {
                 // NOP
                 cycles = 2;
+            }
+            0xED => {
+                // SBC Absolute
+                let address = self.read_absolute_addressed(bus);
+                let value = bus.read(address);
+                self.sub_carry(value);
+                cycles = 4;
             }
             0xEE => {
                 // INC Absolute
