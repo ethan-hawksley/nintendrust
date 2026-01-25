@@ -166,6 +166,41 @@ impl Cpu {
         value_high as u16 * 0x100 + value_low as u16 + self.y as u16
     }
 
+    fn read_zero_page_addressed_x_indexed(&mut self, bus: &Bus) -> u16 {
+        let value_low = bus.read(self.program_counter);
+        self.program_counter += 1;
+        let value_high = bus.read(self.program_counter);
+        self.program_counter += 1;
+        value_high as u16 * 0x100 + value_low as u16 + self.x as u16
+    }
+
+    fn read_zero_page_addressed_y_indexed(&mut self, bus: &Bus) -> u16 {
+        let value_low = bus.read(self.program_counter);
+        self.program_counter += 1;
+        let value_high = bus.read(self.program_counter);
+        self.program_counter += 1;
+        value_high as u16 * 0x100 + value_low as u16 + self.y as u16
+    }
+
+    fn read_indirect_addressed(&mut self, bus: &Bus) -> u16 {
+        let address_low = bus.read(self.program_counter);
+        self.program_counter += 1;
+        let address_high = bus.read(self.program_counter);
+        self.program_counter += 1;
+        let address = address_high as u16 * 0x100 + address_low as u16;
+        let value_low = bus.read(address);
+        let value_high = bus.read(address + 1);
+        value_high as u16 * 0x11 + value_low as u16
+    }
+
+    fn read_indirect_addressed_x_indexed(&mut self, bus: &Bus) -> u16 {
+        let address = bus.read(self.program_counter);
+        self.program_counter += 1;
+        let value_low = bus.read(address as u16);
+        let value_high = bus.read(address as u16 + 1);
+        value_high as u16 * 0x11 + value_low as u16
+    }
+
     fn shift_left(&mut self, bus: &mut Bus, address: u16) {
         let mut value = bus.read(address);
         self.flag_carry = value & 0x80 != 0;
@@ -610,6 +645,12 @@ impl Cpu {
                 self.flag_zero = self.a == 0;
                 self.flag_negative = self.a & 0x80 != 0;
                 _cycles = 2;
+            }
+            0x6C => {
+                // JMP Indirect
+                let value = self.read_indirect_addressed(bus);
+                self.program_counter = value;
+                _cycles = 3;
             }
             0x6D => {
                 // ADC Absolute
