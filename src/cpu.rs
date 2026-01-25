@@ -136,7 +136,7 @@ impl Cpu {
         self.flag_negative = (data & 0x80) != 0;
     }
 
-    fn read_and_increment(&mut self, bus: &Bus) -> u8 {
+    fn read_immediate_addressed(&mut self, bus: &Bus) -> u8 {
         let value = bus.read(self.program_counter);
         self.program_counter = self.program_counter.wrapping_add(1);
         value
@@ -374,13 +374,13 @@ impl Cpu {
             }
             0x05 => {
                 // ORA Zero Page
-                let address = self.read_and_increment(bus);
+                let address = self.read_immediate_addressed(bus);
                 self.bitwise_or(bus, address as u16);
                 _cycles = 3;
             }
             0x06 => {
                 // ASL Zero Page
-                let address = self.read_and_increment(bus);
+                let address = self.read_immediate_addressed(bus);
                 self.shift_left(bus, address as u16);
                 _cycles = 5;
             }
@@ -392,7 +392,7 @@ impl Cpu {
             }
             0x09 => {
                 // ORA Immediate
-                let value = self.read_and_increment(bus);
+                let value = self.read_immediate_addressed(bus);
                 self.a |= value;
                 self.flag_zero = self.a == 0;
                 self.flag_negative = self.a & 0x80 != 0;
@@ -420,7 +420,7 @@ impl Cpu {
             }
             0x10 => {
                 // BPL
-                let offset = self.read_and_increment(bus);
+                let offset = self.read_immediate_addressed(bus);
                 _cycles = self.branch(!self.flag_negative, offset);
             }
             0x18 => {
@@ -441,20 +441,20 @@ impl Cpu {
             }
             0x24 => {
                 // BIT Zero Page
-                let address = self.read_and_increment(bus);
+                let address = self.read_immediate_addressed(bus);
                 let value = bus.read(address as u16);
                 self.bit_test(value);
                 _cycles = 3;
             }
             0x25 => {
                 // AND Zero Page
-                let address = self.read_and_increment(bus);
+                let address = self.read_immediate_addressed(bus);
                 self.bitwise_and(bus, address as u16);
                 _cycles = 3;
             }
             0x26 => {
                 // ROL Zero Page
-                let address = self.read_and_increment(bus);
+                let address = self.read_immediate_addressed(bus);
                 self.rotate_left(bus, address as u16);
                 _cycles = 5;
             }
@@ -466,7 +466,7 @@ impl Cpu {
             }
             0x29 => {
                 // AND Immediate
-                let value = self.read_and_increment(bus);
+                let value = self.read_immediate_addressed(bus);
                 self.a &= value;
                 self.flag_zero = self.a == 0;
                 self.flag_negative = self.a & 0x80 != 0;
@@ -505,7 +505,7 @@ impl Cpu {
             }
             0x30 => {
                 // BMI
-                let offset = self.read_and_increment(bus);
+                let offset = self.read_immediate_addressed(bus);
                 _cycles = self.branch(self.flag_negative, offset);
             }
             0x38 => {
@@ -526,13 +526,13 @@ impl Cpu {
             }
             0x45 => {
                 // EOR Zero Page
-                let address = self.read_and_increment(bus);
+                let address = self.read_immediate_addressed(bus);
                 self.bitwise_eor(bus, address as u16);
                 _cycles = 3;
             }
             0x46 => {
                 // LSR Zero Page
-                let address = self.read_and_increment(bus);
+                let address = self.read_immediate_addressed(bus);
                 self.shift_right(bus, address as u16);
                 _cycles = 5;
             }
@@ -543,7 +543,7 @@ impl Cpu {
             }
             0x49 => {
                 // EOR Immediate
-                let value = self.read_and_increment(bus);
+                let value = self.read_immediate_addressed(bus);
                 self.a ^= value;
                 self.flag_zero = self.a == 0;
                 self.flag_negative = self.a & 0x80 != 0;
@@ -576,7 +576,7 @@ impl Cpu {
             }
             0x50 => {
                 // BVC
-                let offset = self.read_and_increment(bus);
+                let offset = self.read_immediate_addressed(bus);
                 _cycles = self.branch(!self.flag_overflow, offset);
             }
             0x58 => {
@@ -595,14 +595,14 @@ impl Cpu {
             }
             0x65 => {
                 // ADC Zero Page
-                let address = self.read_and_increment(bus);
+                let address = self.read_immediate_addressed(bus);
                 let value = bus.read(address as u16);
                 self.add_carry(value);
                 _cycles = 3;
             }
             0x66 => {
                 // ROR Zero Page
-                let address = self.read_and_increment(bus);
+                let address = self.read_immediate_addressed(bus);
                 self.rotate_right(bus, address as u16);
                 _cycles = 5;
             }
@@ -615,7 +615,7 @@ impl Cpu {
             }
             0x69 => {
                 // ADC Immediate
-                let value = self.read_and_increment(bus);
+                let value = self.read_immediate_addressed(bus);
                 self.add_carry(value);
                 _cycles = 2;
             }
@@ -652,7 +652,7 @@ impl Cpu {
             }
             0x70 => {
                 // BVS
-                let offset = self.read_and_increment(bus);
+                let offset = self.read_immediate_addressed(bus);
                 _cycles = self.branch(self.flag_overflow, offset);
             }
             0x78 => {
@@ -662,19 +662,19 @@ impl Cpu {
             }
             0x84 => {
                 // STY Zero Page
-                let destination_address = self.read_and_increment(bus);
+                let destination_address = self.read_immediate_addressed(bus);
                 bus.write(destination_address as u16, self.y);
                 _cycles = 3;
             }
             0x85 => {
                 // STA Zero Page
-                let destination_address = self.read_and_increment(bus);
+                let destination_address = self.read_immediate_addressed(bus);
                 bus.write(destination_address as u16, self.a);
                 _cycles = 3;
             }
             0x86 => {
                 // STX Zero Page
-                let destination_address = self.read_and_increment(bus);
+                let destination_address = self.read_immediate_addressed(bus);
                 bus.write(destination_address as u16, self.x);
                 _cycles = 3;
             }
@@ -712,7 +712,7 @@ impl Cpu {
             }
             0x90 => {
                 // BCC
-                let offset = self.read_and_increment(bus);
+                let offset = self.read_immediate_addressed(bus);
                 _cycles = self.branch(!self.flag_carry, offset);
             }
             0x98 => {
@@ -729,21 +729,21 @@ impl Cpu {
             }
             0xA0 => {
                 // LDY Immediate
-                self.y = self.read_and_increment(bus);
+                self.y = self.read_immediate_addressed(bus);
                 self.flag_zero = self.y == 0;
                 self.flag_negative = self.y & 0x80 != 0;
                 _cycles = 2;
             }
             0xA2 => {
                 // LDX Immediate
-                self.x = self.read_and_increment(bus);
+                self.x = self.read_immediate_addressed(bus);
                 self.flag_zero = self.x == 0;
                 self.flag_negative = self.x & 0x80 != 0;
                 _cycles = 2;
             }
             0xA5 => {
                 // LDA Zero Page
-                let destination_address = self.read_and_increment(bus);
+                let destination_address = self.read_immediate_addressed(bus);
                 self.a = bus.read(destination_address as u16);
                 self.flag_zero = self.a == 0;
                 self.flag_negative = self.a & 0x80 != 0;
@@ -758,7 +758,7 @@ impl Cpu {
             }
             0xA9 => {
                 // LDA Immediate
-                self.a = self.read_and_increment(bus);
+                self.a = self.read_immediate_addressed(bus);
                 self.flag_zero = self.a == 0;
                 self.flag_negative = self.a & 0x80 != 0;
                 _cycles = 2;
@@ -796,7 +796,7 @@ impl Cpu {
             }
             0xB0 => {
                 // BCS
-                let offset = self.read_and_increment(bus);
+                let offset = self.read_immediate_addressed(bus);
                 _cycles = self.branch(self.flag_carry, offset);
             }
             0xB8 => {
@@ -813,27 +813,27 @@ impl Cpu {
             }
             0xC0 => {
                 // CPY Immediate
-                let value = self.read_and_increment(bus);
+                let value = self.read_immediate_addressed(bus);
                 self.compare_y(value);
                 _cycles = 2;
             }
             0xC4 => {
                 // CPY Zero Page
-                let address = self.read_and_increment(bus);
+                let address = self.read_immediate_addressed(bus);
                 let value = bus.read(address as u16);
                 self.compare_y(value);
                 _cycles = 3;
             }
             0xC5 => {
                 // CMP Zero Page
-                let address = self.read_and_increment(bus);
+                let address = self.read_immediate_addressed(bus);
                 let value = bus.read(address as u16);
                 self.compare_a(value);
                 _cycles = 3;
             }
             0xC6 => {
                 // DEC Zero Page
-                let address = self.read_and_increment(bus);
+                let address = self.read_immediate_addressed(bus);
                 self.decrement(bus, address as u16);
                 _cycles = 5;
             }
@@ -846,7 +846,7 @@ impl Cpu {
             }
             0xC9 => {
                 // CMP Immediate
-                let value = self.read_and_increment(bus);
+                let value = self.read_immediate_addressed(bus);
                 self.compare_a(value);
                 _cycles = 2;
             }
@@ -879,7 +879,7 @@ impl Cpu {
             }
             0xD0 => {
                 // BNE
-                let offset = self.read_and_increment(bus);
+                let offset = self.read_immediate_addressed(bus);
                 _cycles = self.branch(!self.flag_zero, offset);
             }
             0xD8 => {
@@ -889,27 +889,27 @@ impl Cpu {
             }
             0xE0 => {
                 // CPX Immediate
-                let value = self.read_and_increment(bus);
+                let value = self.read_immediate_addressed(bus);
                 self.compare_x(value);
                 _cycles = 2;
             }
             0xE4 => {
                 // CPX Zero Page
-                let address = self.read_and_increment(bus);
+                let address = self.read_immediate_addressed(bus);
                 let value = bus.read(address as u16);
                 self.compare_x(value);
                 _cycles = 3;
             }
             0xE5 => {
                 // SBC Zero Page
-                let address = self.read_and_increment(bus);
+                let address = self.read_immediate_addressed(bus);
                 let value = bus.read(address as u16);
                 self.sub_carry(value);
                 _cycles = 3;
             }
             0xE6 => {
                 // INC Zero Page
-                let address = self.read_and_increment(bus);
+                let address = self.read_immediate_addressed(bus);
                 self.increment(bus, address as u16);
                 _cycles = 5;
             }
@@ -922,7 +922,7 @@ impl Cpu {
             }
             0xE9 => {
                 // SBC Immediate
-                let value = self.read_and_increment(bus);
+                let value = self.read_immediate_addressed(bus);
                 self.sub_carry(value);
                 _cycles = 2;
             }
@@ -952,7 +952,7 @@ impl Cpu {
             }
             0xF0 => {
                 // BEQ
-                let offset = self.read_and_increment(bus);
+                let offset = self.read_immediate_addressed(bus);
                 _cycles = self.branch(self.flag_zero, offset);
             }
             0xF8 => {
