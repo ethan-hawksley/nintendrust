@@ -203,28 +203,12 @@ impl Cpu {
 
     fn compare_y(&mut self, value: u8) {
         self.compare(self.y, value);
-        r#"
-            0x42 => {
-                // LSR Immediate
-                let value = self.read_and_increment(bus);
-                self.shift_right(bus, value);
-                cycles = 2;
-            }
-            0x46 => {
-                // LSR Zero Page
-                let address = self.read_and_increment(bus);
-                let value = bus.read(address);
-                self.shift_right(bus, value);
-                cycles = 3;
-            }
-            0x4D => {
-                // LSR Absolute
-                let address = self.read_absolute_addressed(bus);
-                let value = bus.read(address);
-                self.bitwise_eor(bus, value);
-                cycles = 4;
-            }
-        "#;
+    }
+
+    fn bit_test(&mut self, value: u8) {
+        self.flag_zero = self.a & value == 0;
+        self.flag_negative = value & 0x80 != 0;
+        self.flag_overflow = value & 0x40 != 0;
     }
 
     pub fn emulate_cpu(&mut self, bus: &mut Bus) {
@@ -319,6 +303,12 @@ impl Cpu {
                     destination_address_high as u16 * 256 + destination_address_low as u16;
                 cycles = 6;
             }
+            0x24 => {
+                // BIT Zero Page
+                let address = self.read_and_increment(bus);
+                let value = bus.read(address as u16);
+                self.bit_test(value);
+            }
             0x25 => {
                 // AND Zero Page
                 let address = self.read_and_increment(bus);
@@ -356,6 +346,12 @@ impl Cpu {
                 self.flag_zero = self.a == 0;
                 self.flag_negative = self.a & 0x80 != 0;
                 cycles = 2;
+            }
+            0x2C => {
+                // BIT Absolute
+                let address = self.read_absolute_addressed(bus);
+                let value = bus.read(address);
+                self.bit_test(value);
             }
             0x2D => {
                 // AND Absolute
