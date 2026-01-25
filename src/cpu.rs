@@ -218,6 +218,21 @@ impl Cpu {
         let mut cycles = 0;
 
         match opcode {
+            0x00 => {
+                // BRK
+                self.program_counter += 1;
+                self.push(bus, (self.program_counter / 256) as u8);
+                self.push(bus, self.program_counter as u8);
+
+                let status = self.get_status_register(true);
+                self.push(bus, status);
+
+                let destination_address_low = bus.read(0xFFFE);
+                let destination_address_high = bus.read(0xFFFF);
+                self.program_counter =
+                    destination_address_high as u16 * 0x100 + destination_address_low as u16;
+                cycles = 7;
+            }
             0x02 => {
                 // HTL
                 self.halted = true;
@@ -300,7 +315,7 @@ impl Cpu {
                 self.push(bus, (self.program_counter / 256) as u8);
                 self.push(bus, self.program_counter as u8);
                 self.program_counter =
-                    destination_address_high as u16 * 256 + destination_address_low as u16;
+                    destination_address_high as u16 * 0x100 + destination_address_low as u16;
                 cycles = 6;
             }
             0x24 => {
@@ -388,6 +403,16 @@ impl Cpu {
                 // SEC
                 self.flag_carry = true;
                 cycles = 2;
+            }
+            0x40 => {
+                // RTI
+                let status = self.pull(bus);
+                self.set_status_register(status);
+
+                let return_address_low = self.pull(bus);
+                let return_address_high = self.pull(bus);
+                self.program_counter = return_address_high as u16 * 256 + return_address_low as u16;
+                cycles = 6;
             }
             0x45 => {
                 // EOR Zero Page
