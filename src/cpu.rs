@@ -150,6 +150,22 @@ impl Cpu {
         value_high as u16 * 0x100 + value_low as u16
     }
 
+    fn read_absolute_addressed_x_indexed(&mut self, bus: &Bus) -> u16 {
+        let value_low = bus.read(self.program_counter);
+        self.program_counter += 1;
+        let value_high = bus.read(self.program_counter);
+        self.program_counter += 1;
+        value_high as u16 * 0x100 + value_low as u16 + self.x as u16
+    }
+
+    fn read_absolute_addressed_y_indexed(&mut self, bus: &Bus) -> u16 {
+        let value_low = bus.read(self.program_counter);
+        self.program_counter += 1;
+        let value_high = bus.read(self.program_counter);
+        self.program_counter += 1;
+        value_high as u16 * 0x100 + value_low as u16 + self.y as u16
+    }
+
     fn shift_left(&mut self, bus: &mut Bus, address: u16) {
         let mut value = bus.read(address);
         self.flag_carry = value & 0x80 != 0;

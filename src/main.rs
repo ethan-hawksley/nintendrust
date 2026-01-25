@@ -4,7 +4,7 @@ use nintendrust::rom::Rom;
 use std::fs;
 
 fn main() {
-    let file_path = "4_TheStack.nes";
+    let file_path = "5_Instructions1.nes";
     let raw_bytes = match fs::read(file_path) {
         Ok(bytes) => bytes,
         Err(e) => {
