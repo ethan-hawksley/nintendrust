@@ -37,9 +37,9 @@ impl Cpu {
     fn get_operand_mode(&self, opcode: u8) -> u8 {
         match opcode {
             // Single Byte Instructions
-            0x00 | 0x08 | 0x18 | 0x20 | 0x28 | 0x38 | 0x40 | 0x48 | 0x58 | 0x60 | 0x68 | 0x78
-            | 0x88 | 0x8A | 0x98 | 0x9A | 0xA8 | 0xAA | 0xB8 | 0xBA | 0xC8 | 0xCA | 0xD8 | 0xE8
-            | 0xEA | 0xF8 | 0x0A | 0x2A | 0x4A | 0x6A => 1,
+            0x00 | 0x08 | 0x18 | 0x28 | 0x38 | 0x40 | 0x48 | 0x58 | 0x60 | 0x68 | 0x78 | 0x88
+            | 0x8A | 0x98 | 0x9A | 0xA8 | 0xAA | 0xB8 | 0xBA | 0xC8 | 0xCA | 0xD8 | 0xE8 | 0xEA
+            | 0xF8 | 0x0A | 0x2A | 0x4A | 0x6A => 1,
 
             // 2 Byte Instructions
             0x05 | 0x06 | 0x09 | 0x10 | 0x24 | 0x25 | 0x26 | 0x29 | 0x30 | 0x45 | 0x46 | 0x49
@@ -48,8 +48,8 @@ impl Cpu {
             | 0xE9 | 0xF0 => 2,
 
             // 3 Byte Instructions
-            0x0D | 0x0E | 0x2D | 0x2E | 0x4C | 0x4D | 0x4E | 0x6D | 0x6E | 0x8C | 0x8D | 0x8E
-            | 0xAC | 0xAD | 0xAE | 0xCC | 0xCD | 0xCE | 0xEC | 0xED | 0xEE => 3,
+            0x0D | 0x0E | 0x20 | 0x2D | 0x2E | 0x4C | 0x4D | 0x4E | 0x6D | 0x6E | 0x8C | 0x8D
+            | 0x8E | 0xAC | 0xAD | 0xAE | 0xCC | 0xCD | 0xCE | 0xEC | 0xED | 0xEE => 3,
 
             // Any other instructions
             _ => 1,
@@ -167,19 +167,15 @@ impl Cpu {
     }
 
     fn read_zero_page_addressed_x_indexed(&mut self, bus: &Bus) -> u16 {
-        let value_low = bus.read(self.program_counter);
+        let address = bus.read(self.program_counter);
         self.program_counter += 1;
-        let value_high = bus.read(self.program_counter);
-        self.program_counter += 1;
-        value_high as u16 * 0x100 + value_low as u16 + self.x as u16
+        address.wrapping_add(self.x) as u16
     }
 
     fn read_zero_page_addressed_y_indexed(&mut self, bus: &Bus) -> u16 {
-        let value_low = bus.read(self.program_counter);
+        let address = bus.read(self.program_counter);
         self.program_counter += 1;
-        let value_high = bus.read(self.program_counter);
-        self.program_counter += 1;
-        value_high as u16 * 0x100 + value_low as u16 + self.y as u16
+        address.wrapping_add(self.y) as u16
     }
 
     fn read_indirect_addressed(&mut self, bus: &Bus) -> u16 {
@@ -189,16 +185,25 @@ impl Cpu {
         self.program_counter += 1;
         let address = address_high as u16 * 0x100 + address_low as u16;
         let value_low = bus.read(address);
-        let value_high = bus.read(address + 1);
-        value_high as u16 * 0x11 + value_low as u16
+        let high_address = (address & 0xFF00) | ((address.wrapping_add(1)) & 0x00FF);
+        let value_high = bus.read(high_address);
+        value_high as u16 * 0x100 + value_low as u16
     }
 
     fn read_indirect_addressed_x_indexed(&mut self, bus: &Bus) -> u16 {
-        let address = bus.read(self.program_counter);
+        let address = bus.read(self.program_counter).wrapping_add(self.x);
         self.program_counter += 1;
         let value_low = bus.read(address as u16);
         let value_high = bus.read(address as u16 + 1);
-        value_high as u16 * 0x11 + value_low as u16
+        value_high as u16 * 0x100 + value_low as u16
+    }
+
+    fn read_indirect_addressed_y_indexed(&mut self, bus: &Bus) -> u16 {
+        let address = bus.read(self.program_counter).wrapping_add(self.y);
+        self.program_counter += 1;
+        let value_low = bus.read(address as u16);
+        let value_high = bus.read(address as u16 + 1);
+        value_high as u16 * 0x100 + value_low as u16
     }
 
     fn shift_left(&mut self, bus: &mut Bus, address: u16) {
@@ -261,21 +266,21 @@ impl Cpu {
         bus.write(address, value);
     }
 
-    fn bitwise_or(&mut self, bus: &mut Bus, address: u16) {
+    fn bitwise_or(&mut self, bus: &Bus, address: u16) {
         let value = bus.read(address);
         self.a |= value;
         self.flag_zero = self.a == 0;
         self.flag_negative = self.a & 0x80 != 0;
     }
 
-    fn bitwise_and(&mut self, bus: &mut Bus, address: u16) {
+    fn bitwise_and(&mut self, bus: &Bus, address: u16) {
         let value = bus.read(address);
         self.a &= value;
         self.flag_zero = self.a == 0;
         self.flag_negative = self.a & 0x80 != 0;
     }
 
-    fn bitwise_eor(&mut self, bus: &mut Bus, address: u16) {
+    fn bitwise_eor(&mut self, bus: &Bus, address: u16) {
         let value = bus.read(address);
         self.a ^= value;
         self.flag_zero = self.a == 0;
@@ -338,6 +343,8 @@ impl Cpu {
 
                 let status = self.get_status_register(true);
                 self.push(bus, status);
+
+                self.flag_interrupt_disable = true;
 
                 let destination_address_low = bus.read(0xFFFE);
                 let destination_address_high = bus.read(0xFFFF);
