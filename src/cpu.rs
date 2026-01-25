@@ -187,6 +187,46 @@ impl Cpu {
         self.flag_negative = self.a & 0x80 != 0;
     }
 
+    fn compare(&mut self, register: u8, value: u8) {
+        self.flag_carry = register >= value;
+        self.flag_zero = register == value;
+        self.flag_negative = register.wrapping_sub(value) & 0x80 != 0;
+    }
+
+    fn compare_a(&mut self, value: u8) {
+        self.compare(self.a, value);
+    }
+
+    fn compare_x(&mut self, value: u8) {
+        self.compare(self.x, value);
+    }
+
+    fn compare_y(&mut self, value: u8) {
+        self.compare(self.y, value);
+        r#"
+            0x42 => {
+                // LSR Immediate
+                let value = self.read_and_increment(bus);
+                self.shift_right(bus, value);
+                cycles = 2;
+            }
+            0x46 => {
+                // LSR Zero Page
+                let address = self.read_and_increment(bus);
+                let value = bus.read(address);
+                self.shift_right(bus, value);
+                cycles = 3;
+            }
+            0x4D => {
+                // LSR Absolute
+                let address = self.read_absolute_addressed(bus);
+                let value = bus.read(address);
+                self.bitwise_eor(bus, value);
+                cycles = 4;
+            }
+        "#;
+    }
+
     pub fn emulate_cpu(&mut self, bus: &mut Bus) {
         let opcode = bus.read(self.program_counter);
         println!("0x{:02x}", opcode);
@@ -673,6 +713,26 @@ impl Cpu {
                 self.flag_negative = self.x & 0x80 != 0;
                 cycles = 2;
             }
+            0xC0 => {
+                // CPY Immediate
+                let value = self.read_and_increment(bus);
+                self.compare_y(value);
+                cycles = 2;
+            }
+            0xC4 => {
+                // CPY Zero Page
+                let address = self.read_and_increment(bus);
+                let value = bus.read(address as u16);
+                self.compare_y(value);
+                cycles = 3;
+            }
+            0xC5 => {
+                // CMP Zero Page
+                let address = self.read_and_increment(bus);
+                let value = bus.read(address as u16);
+                self.compare_a(value);
+                cycles = 3;
+            }
             0xC6 => {
                 // DEC Zero Page
                 let address = self.read_and_increment(bus);
@@ -686,12 +746,32 @@ impl Cpu {
                 self.flag_negative = self.y & 0x80 != 0;
                 cycles = 2;
             }
+            0xC9 => {
+                // CMP Immediate
+                let value = self.read_and_increment(bus);
+                self.compare_a(value);
+                cycles = 2;
+            }
             0xCA => {
                 // DEX
                 self.x = self.x.wrapping_sub(1);
                 self.flag_zero = self.x == 0;
                 self.flag_negative = self.x & 0x80 != 0;
                 cycles = 2;
+            }
+            0xCC => {
+                // CPY Absolute
+                let address = self.read_absolute_addressed(bus);
+                let value = bus.read(address);
+                self.compare_y(value);
+                cycles = 4;
+            }
+            0xCD => {
+                // CMP Absolute
+                let address = self.read_absolute_addressed(bus);
+                let value = bus.read(address);
+                self.compare_a(value);
+                cycles = 4;
             }
             0xCE => {
                 // DEC Absolute
@@ -723,7 +803,26 @@ impl Cpu {
                 self.flag_decimal = false;
                 cycles = 2;
             }
-
+            0xE0 => {
+                // CPX Immediate
+                let value = self.read_and_increment(bus);
+                self.compare_x(value);
+                cycles = 2;
+            }
+            0xE4 => {
+                // CPX Zero Page
+                let address = self.read_and_increment(bus);
+                let value = bus.read(address as u16);
+                self.compare_x(value);
+                cycles = 3;
+            }
+            0xEC => {
+                // CPX Absolute
+                let address = self.read_absolute_addressed(bus);
+                let value = bus.read(address);
+                self.compare_x(value);
+                cycles = 4;
+            }
             0xE5 => {
                 // SBC Zero Page
                 let address = self.read_and_increment(bus);
