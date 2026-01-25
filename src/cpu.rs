@@ -36,20 +36,25 @@ impl Cpu {
 
     fn get_operand_mode(&self, opcode: u8) -> u8 {
         match opcode {
-            // Single Byte Instructions
+            // Single Byte Instructions (Implied/Accumulator)
             0x00 | 0x08 | 0x18 | 0x28 | 0x38 | 0x40 | 0x48 | 0x58 | 0x60 | 0x68 | 0x78 | 0x88
             | 0x8A | 0x98 | 0x9A | 0xA8 | 0xAA | 0xB8 | 0xBA | 0xC8 | 0xCA | 0xD8 | 0xE8 | 0xEA
             | 0xF8 | 0x0A | 0x2A | 0x4A | 0x6A => 1,
 
-            // 2 Byte Instructions
-            0x05 | 0x06 | 0x09 | 0x10 | 0x24 | 0x25 | 0x26 | 0x29 | 0x30 | 0x45 | 0x46 | 0x49
-            | 0x50 | 0x65 | 0x66 | 0x69 | 0x70 | 0x84 | 0x85 | 0x86 | 0x90 | 0xA0 | 0xA2 | 0xA5
-            | 0xA9 | 0xB0 | 0xC0 | 0xC4 | 0xC5 | 0xC6 | 0xC9 | 0xD0 | 0xE0 | 0xE4 | 0xE5 | 0xE6
-            | 0xE9 | 0xF0 => 2,
+            // 2 Byte Instructions (Immediate, Zero Page, Zero Page Indexed, Indirect Indexed, Relative)
+            0x01 | 0x05 | 0x06 | 0x09 | 0x10 | 0x11 | 0x15 | 0x16 | 0x21 | 0x24 | 0x25 | 0x26
+            | 0x29 | 0x30 | 0x31 | 0x35 | 0x36 | 0x41 | 0x45 | 0x46 | 0x49 | 0x50 | 0x51 | 0x55
+            | 0x56 | 0x61 | 0x65 | 0x66 | 0x69 | 0x70 | 0x71 | 0x75 | 0x76 | 0x81 | 0x84 | 0x85
+            | 0x86 | 0x90 | 0x91 | 0x94 | 0x95 | 0x96 | 0xA0 | 0xA1 | 0xA2 | 0xA4 | 0xA5 | 0xA6
+            | 0xA9 | 0xB0 | 0xB1 | 0xB4 | 0xB5 | 0xB6 | 0xC0 | 0xC1 | 0xC4 | 0xC5 | 0xC6 | 0xC9
+            | 0xD0 | 0xD1 | 0xD5 | 0xD6 | 0xE0 | 0xE1 | 0xE4 | 0xE5 | 0xE6 | 0xE9 | 0xF0 | 0xF1
+            | 0xF5 | 0xF6 => 2,
 
-            // 3 Byte Instructions
-            0x0D | 0x0E | 0x20 | 0x2C | 0x2D | 0x2E | 0x4C | 0x4D | 0x4E | 0x6C | 0x6D | 0x6E
-            | 0x8C | 0x8D | 0x8E | 0xAC | 0xAD | 0xAE | 0xCC | 0xCD | 0xCE | 0xEC | 0xED | 0xEE => {
+            // 3 Byte Instructions (Absolute, Absolute Indexed, Indirect)
+            0x0D | 0x0E | 0x19 | 0x1D | 0x1E | 0x20 | 0x2C | 0x2D | 0x2E | 0x39 | 0x3D | 0x3E
+            | 0x4C | 0x4D | 0x4E | 0x59 | 0x5D | 0x5E | 0x6C | 0x6D | 0x6E | 0x79 | 0x7D | 0x7E
+            | 0x8C | 0x8D | 0x8E | 0x99 | 0x9D | 0xAC | 0xAD | 0xAE | 0xB9 | 0xBC | 0xBD | 0xBE
+            | 0xCC | 0xCD | 0xCE | 0xD9 | 0xDD | 0xDE | 0xEC | 0xED | 0xEE | 0xF9 | 0xFD | 0xFE => {
                 3
             }
 
@@ -368,6 +373,12 @@ impl Cpu {
                     (destination_address_high as u16) << 8 | destination_address_low as u16;
                 _cycles = 7;
             }
+            0x01 => {
+                // ORA Indirect,X
+                let address = self.read_indirect_addressed_x_indexed(bus);
+                self.bitwise_or(bus, address);
+                _cycles = 6;
+            }
             0x02 => {
                 // HTL
                 self.halted = true;
@@ -423,10 +434,46 @@ impl Cpu {
                 let offset = self.read_immediate_addressed(bus);
                 _cycles = self.branch(!self.flag_negative, offset);
             }
+            0x11 => {
+                // ORA Indirect,Y
+                let address = self.read_indirect_addressed_y_indexed(bus);
+                self.bitwise_or(bus, address);
+                _cycles = 5;
+            }
+            0x15 => {
+                // ORA Zero Page,X
+                let address = self.read_zero_page_addressed_x_indexed(bus);
+                self.bitwise_or(bus, address);
+                _cycles = 4;
+            }
+            0x16 => {
+                // ASL Zero Page,X
+                let address = self.read_zero_page_addressed_x_indexed(bus);
+                self.shift_left(bus, address);
+                _cycles = 6;
+            }
             0x18 => {
                 // CLC
                 self.flag_carry = false;
                 _cycles = 2;
+            }
+            0x19 => {
+                // ORA Absolute,Y
+                let address = self.read_absolute_addressed_y_indexed(bus);
+                self.bitwise_or(bus, address);
+                _cycles = 4;
+            }
+            0x1D => {
+                // ORA Absolute,X
+                let address = self.read_absolute_addressed_x_indexed(bus);
+                self.bitwise_or(bus, address);
+                _cycles = 4;
+            }
+            0x1E => {
+                // ASL Absolute,X
+                let address = self.read_absolute_addressed_x_indexed(bus);
+                self.shift_left(bus, address);
+                _cycles = 7;
             }
             0x20 => {
                 // JSR
@@ -437,6 +484,12 @@ impl Cpu {
                 self.push(bus, self.program_counter as u8);
                 self.program_counter =
                     (destination_address_high as u16) << 8 | destination_address_low as u16;
+                _cycles = 6;
+            }
+            0x21 => {
+                // AND Indirect,X
+                let address = self.read_indirect_addressed_x_indexed(bus);
+                self.bitwise_and(bus, address);
                 _cycles = 6;
             }
             0x24 => {
@@ -508,10 +561,46 @@ impl Cpu {
                 let offset = self.read_immediate_addressed(bus);
                 _cycles = self.branch(self.flag_negative, offset);
             }
+            0x31 => {
+                // AND Indirect,Y
+                let address = self.read_indirect_addressed_y_indexed(bus);
+                self.bitwise_and(bus, address);
+                _cycles = 5;
+            }
+            0x35 => {
+                // AND Zero Page,X
+                let address = self.read_zero_page_addressed_x_indexed(bus);
+                self.bitwise_and(bus, address);
+                _cycles = 4;
+            }
+            0x36 => {
+                // ROL Zero Page,X
+                let address = self.read_zero_page_addressed_x_indexed(bus);
+                self.rotate_left(bus, address);
+                _cycles = 6;
+            }
             0x38 => {
                 // SEC
                 self.flag_carry = true;
                 _cycles = 2;
+            }
+            0x39 => {
+                // AND Absolute,Y
+                let address = self.read_absolute_addressed_y_indexed(bus);
+                self.bitwise_and(bus, address);
+                _cycles = 4;
+            }
+            0x3D => {
+                // AND Absolute,X
+                let address = self.read_absolute_addressed_x_indexed(bus);
+                self.bitwise_and(bus, address);
+                _cycles = 4;
+            }
+            0x3E => {
+                // ROL Absolute,X
+                let address = self.read_absolute_addressed_x_indexed(bus);
+                self.rotate_left(bus, address);
+                _cycles = 7;
             }
             0x40 => {
                 // RTI
@@ -522,6 +611,12 @@ impl Cpu {
                 let return_address_high = self.pull(bus);
                 self.program_counter =
                     (return_address_high as u16) << 8 | return_address_low as u16;
+                _cycles = 6;
+            }
+            0x41 => {
+                // EOR Indirect,X
+                let address = self.read_indirect_addressed_x_indexed(bus);
+                self.bitwise_eor(bus, address);
                 _cycles = 6;
             }
             0x45 => {
@@ -579,10 +674,46 @@ impl Cpu {
                 let offset = self.read_immediate_addressed(bus);
                 _cycles = self.branch(!self.flag_overflow, offset);
             }
+            0x51 => {
+                // EOR Indirect,Y
+                let address = self.read_indirect_addressed_y_indexed(bus);
+                self.bitwise_eor(bus, address);
+                _cycles = 5;
+            }
+            0x55 => {
+                // EOR Zero Page,X
+                let address = self.read_zero_page_addressed_x_indexed(bus);
+                self.bitwise_eor(bus, address);
+                _cycles = 4;
+            }
+            0x56 => {
+                // LSR Zero Page,X
+                let address = self.read_zero_page_addressed_x_indexed(bus);
+                self.shift_right(bus, address);
+                _cycles = 6;
+            }
             0x58 => {
                 // CLI
                 self.flag_interrupt_disable = false;
                 _cycles = 2;
+            }
+            0x59 => {
+                // EOR Absolute,Y
+                let address = self.read_absolute_addressed_y_indexed(bus);
+                self.bitwise_eor(bus, address);
+                _cycles = 4;
+            }
+            0x5D => {
+                // EOR Absolute,X
+                let address = self.read_absolute_addressed_x_indexed(bus);
+                self.bitwise_eor(bus, address);
+                _cycles = 4;
+            }
+            0x5E => {
+                // LSR Absolute,X
+                let address = self.read_absolute_addressed_x_indexed(bus);
+                self.shift_right(bus, address);
+                _cycles = 7;
             }
             0x60 => {
                 // RTS
@@ -591,6 +722,13 @@ impl Cpu {
                 self.program_counter =
                     (return_address_high as u16) << 8 | return_address_low as u16;
                 self.program_counter = self.program_counter.wrapping_add(1);
+                _cycles = 6;
+            }
+            0x61 => {
+                // ADC Indirect,X
+                let address = self.read_indirect_addressed_x_indexed(bus);
+                let value = bus.read(address);
+                self.add_carry(value);
                 _cycles = 6;
             }
             0x65 => {
@@ -655,10 +793,56 @@ impl Cpu {
                 let offset = self.read_immediate_addressed(bus);
                 _cycles = self.branch(self.flag_overflow, offset);
             }
+            0x71 => {
+                // ADC Indirect,Y
+                let address = self.read_indirect_addressed_y_indexed(bus);
+                let value = bus.read(address);
+                self.add_carry(value);
+                _cycles = 5;
+            }
+            0x75 => {
+                // ADC Zero Page,X
+                let address = self.read_zero_page_addressed_x_indexed(bus);
+                let value = bus.read(address);
+                self.add_carry(value);
+                _cycles = 4;
+            }
+            0x76 => {
+                // ROR Zero Page,X
+                let address = self.read_zero_page_addressed_x_indexed(bus);
+                self.rotate_right(bus, address);
+                _cycles = 6;
+            }
             0x78 => {
                 // SEI
                 self.flag_interrupt_disable = true;
                 _cycles = 2;
+            }
+            0x79 => {
+                // ADC Absolute,Y
+                let address = self.read_absolute_addressed_y_indexed(bus);
+                let value = bus.read(address);
+                self.add_carry(value);
+                _cycles = 4;
+            }
+            0x7D => {
+                // ADC Absolute,X
+                let address = self.read_absolute_addressed_x_indexed(bus);
+                let value = bus.read(address);
+                self.add_carry(value);
+                _cycles = 4;
+            }
+            0x7E => {
+                // ROR Absolute,X
+                let address = self.read_absolute_addressed_x_indexed(bus);
+                self.rotate_right(bus, address);
+                _cycles = 7;
+            }
+            0x81 => {
+                // STA Indirect,X
+                let address = self.read_indirect_addressed_x_indexed(bus);
+                bus.write(address, self.a);
+                _cycles = 6;
             }
             0x84 => {
                 // STY Zero Page
@@ -715,6 +899,30 @@ impl Cpu {
                 let offset = self.read_immediate_addressed(bus);
                 _cycles = self.branch(!self.flag_carry, offset);
             }
+            0x91 => {
+                // STA Indirect,Y
+                let address = self.read_indirect_addressed_y_indexed(bus);
+                bus.write(address, self.a);
+                _cycles = 6;
+            }
+            0x94 => {
+                // STY Zero Page,X
+                let address = self.read_zero_page_addressed_x_indexed(bus);
+                bus.write(address, self.y);
+                _cycles = 4;
+            }
+            0x95 => {
+                // STA Zero Page,X
+                let address = self.read_zero_page_addressed_x_indexed(bus);
+                bus.write(address, self.a);
+                _cycles = 4;
+            }
+            0x96 => {
+                // STX Zero Page,Y
+                let address = self.read_zero_page_addressed_y_indexed(bus);
+                bus.write(address, self.x);
+                _cycles = 4;
+            }
             0x98 => {
                 // TYA
                 self.a = self.y;
@@ -722,10 +930,22 @@ impl Cpu {
                 self.flag_negative = self.a & 0x80 != 0;
                 _cycles = 2;
             }
+            0x99 => {
+                // STA Absolute,Y
+                let address = self.read_absolute_addressed_y_indexed(bus);
+                bus.write(address, self.a);
+                _cycles = 5;
+            }
             0x9A => {
                 // TXS
                 self.stack_pointer = self.x;
                 _cycles = 2;
+            }
+            0x9D => {
+                // STA Absolute,X
+                let address = self.read_absolute_addressed_x_indexed(bus);
+                bus.write(address, self.a);
+                _cycles = 5;
             }
             0xA0 => {
                 // LDY Immediate
@@ -734,6 +954,14 @@ impl Cpu {
                 self.flag_negative = self.y & 0x80 != 0;
                 _cycles = 2;
             }
+            0xA1 => {
+                // LDA Indirect,X
+                let address = self.read_indirect_addressed_x_indexed(bus);
+                self.a = bus.read(address);
+                self.flag_zero = self.a == 0;
+                self.flag_negative = self.a & 0x80 != 0;
+                _cycles = 6;
+            }
             0xA2 => {
                 // LDX Immediate
                 self.x = self.read_immediate_addressed(bus);
@@ -741,12 +969,28 @@ impl Cpu {
                 self.flag_negative = self.x & 0x80 != 0;
                 _cycles = 2;
             }
+            0xA4 => {
+                // LDY Zero Page
+                let address = self.read_immediate_addressed(bus);
+                self.y = bus.read(address as u16);
+                self.flag_zero = self.y == 0;
+                self.flag_negative = self.y & 0x80 != 0;
+                _cycles = 3;
+            }
             0xA5 => {
                 // LDA Zero Page
                 let destination_address = self.read_immediate_addressed(bus);
                 self.a = bus.read(destination_address as u16);
                 self.flag_zero = self.a == 0;
                 self.flag_negative = self.a & 0x80 != 0;
+                _cycles = 3;
+            }
+            0xA6 => {
+                // LDX Zero Page
+                let address = self.read_immediate_addressed(bus);
+                self.x = bus.read(address as u16);
+                self.flag_zero = self.x == 0;
+                self.flag_negative = self.x & 0x80 != 0;
                 _cycles = 3;
             }
             0xA8 => {
@@ -799,10 +1043,50 @@ impl Cpu {
                 let offset = self.read_immediate_addressed(bus);
                 _cycles = self.branch(self.flag_carry, offset);
             }
+            0xB1 => {
+                // LDA Indirect,Y
+                let address = self.read_indirect_addressed_y_indexed(bus);
+                self.a = bus.read(address);
+                self.flag_zero = self.a == 0;
+                self.flag_negative = self.a & 0x80 != 0;
+                _cycles = 5;
+            }
+            0xB4 => {
+                // LDY Zero Page,X
+                let address = self.read_zero_page_addressed_x_indexed(bus);
+                self.y = bus.read(address);
+                self.flag_zero = self.y == 0;
+                self.flag_negative = self.y & 0x80 != 0;
+                _cycles = 4;
+            }
+            0xB5 => {
+                // LDA Zero Page,X
+                let address = self.read_zero_page_addressed_x_indexed(bus);
+                self.a = bus.read(address);
+                self.flag_zero = self.a == 0;
+                self.flag_negative = self.a & 0x80 != 0;
+                _cycles = 4;
+            }
+            0xB6 => {
+                // LDX Zero Page,Y
+                let address = self.read_zero_page_addressed_y_indexed(bus);
+                self.x = bus.read(address);
+                self.flag_zero = self.x == 0;
+                self.flag_negative = self.x & 0x80 != 0;
+                _cycles = 4;
+            }
             0xB8 => {
                 // CLV
                 self.flag_overflow = false;
                 _cycles = 2;
+            }
+            0xB9 => {
+                // LDA Absolute,Y
+                let address = self.read_absolute_addressed_y_indexed(bus);
+                self.a = bus.read(address);
+                self.flag_zero = self.a == 0;
+                self.flag_negative = self.a & 0x80 != 0;
+                _cycles = 4;
             }
             0xBA => {
                 // TSX
@@ -811,11 +1095,42 @@ impl Cpu {
                 self.flag_negative = self.x & 0x80 != 0;
                 _cycles = 2;
             }
+            0xBC => {
+                // LDY Absolute,X
+                let address = self.read_absolute_addressed_x_indexed(bus);
+                self.y = bus.read(address);
+                self.flag_zero = self.y == 0;
+                self.flag_negative = self.y & 0x80 != 0;
+                _cycles = 4;
+            }
+            0xBD => {
+                // LDA Absolute,X
+                let address = self.read_absolute_addressed_x_indexed(bus);
+                self.a = bus.read(address);
+                self.flag_zero = self.a == 0;
+                self.flag_negative = self.a & 0x80 != 0;
+                _cycles = 4;
+            }
+            0xBE => {
+                // LDX Absolute,Y
+                let address = self.read_absolute_addressed_y_indexed(bus);
+                self.x = bus.read(address);
+                self.flag_zero = self.x == 0;
+                self.flag_negative = self.x & 0x80 != 0;
+                _cycles = 4;
+            }
             0xC0 => {
                 // CPY Immediate
                 let value = self.read_immediate_addressed(bus);
                 self.compare_y(value);
                 _cycles = 2;
+            }
+            0xC1 => {
+                // CMP Indirect,X
+                let address = self.read_indirect_addressed_x_indexed(bus);
+                let value = bus.read(address);
+                self.compare_a(value);
+                _cycles = 6;
             }
             0xC4 => {
                 // CPY Zero Page
@@ -882,16 +1197,63 @@ impl Cpu {
                 let offset = self.read_immediate_addressed(bus);
                 _cycles = self.branch(!self.flag_zero, offset);
             }
+            0xD1 => {
+                // CMP Indirect,Y
+                let address = self.read_indirect_addressed_y_indexed(bus);
+                let value = bus.read(address);
+                self.compare_a(value);
+                _cycles = 5;
+            }
+            0xD5 => {
+                // CMP Zero Page,X
+                let address = self.read_zero_page_addressed_x_indexed(bus);
+                let value = bus.read(address);
+                self.compare_a(value);
+                _cycles = 4;
+            }
+            0xD6 => {
+                // DEC Zero Page,X
+                let address = self.read_zero_page_addressed_x_indexed(bus);
+                self.decrement(bus, address);
+                _cycles = 6;
+            }
             0xD8 => {
                 // CLD
                 self.flag_decimal = false;
                 _cycles = 2;
+            }
+            0xD9 => {
+                // CMP Absolute,Y
+                let address = self.read_absolute_addressed_y_indexed(bus);
+                let value = bus.read(address);
+                self.compare_a(value);
+                _cycles = 4;
+            }
+            0xDD => {
+                // CMP Absolute,X
+                let address = self.read_absolute_addressed_x_indexed(bus);
+                let value = bus.read(address);
+                self.compare_a(value);
+                _cycles = 4;
+            }
+            0xDE => {
+                // DEC Absolute,X
+                let address = self.read_absolute_addressed_x_indexed(bus);
+                self.decrement(bus, address);
+                _cycles = 7;
             }
             0xE0 => {
                 // CPX Immediate
                 let value = self.read_immediate_addressed(bus);
                 self.compare_x(value);
                 _cycles = 2;
+            }
+            0xE1 => {
+                // SBC Indirect,X
+                let address = self.read_indirect_addressed_x_indexed(bus);
+                let value = bus.read(address);
+                self.sub_carry(value);
+                _cycles = 6;
             }
             0xE4 => {
                 // CPX Zero Page
@@ -955,10 +1317,50 @@ impl Cpu {
                 let offset = self.read_immediate_addressed(bus);
                 _cycles = self.branch(self.flag_zero, offset);
             }
+            0xF1 => {
+                // SBC Indirect,Y
+                let address = self.read_indirect_addressed_y_indexed(bus);
+                let value = bus.read(address);
+                self.sub_carry(value);
+                _cycles = 5;
+            }
+            0xF5 => {
+                // SBC Zero Page,X
+                let address = self.read_zero_page_addressed_x_indexed(bus);
+                let value = bus.read(address);
+                self.sub_carry(value);
+                _cycles = 4;
+            }
+            0xF6 => {
+                // INC Zero Page,X
+                let address = self.read_zero_page_addressed_x_indexed(bus);
+                self.increment(bus, address);
+                _cycles = 6;
+            }
             0xF8 => {
                 // SED
                 self.flag_decimal = true;
                 _cycles = 2;
+            }
+            0xF9 => {
+                // SBC Absolute,Y
+                let address = self.read_absolute_addressed_y_indexed(bus);
+                let value = bus.read(address);
+                self.sub_carry(value);
+                _cycles = 4;
+            }
+            0xFD => {
+                // SBC Absolute,X
+                let address = self.read_absolute_addressed_x_indexed(bus);
+                let value = bus.read(address);
+                self.sub_carry(value);
+                _cycles = 4;
+            }
+            0xFE => {
+                // INC Absolute,X
+                let address = self.read_absolute_addressed_x_indexed(bus);
+                self.increment(bus, address);
+                _cycles = 7;
             }
             _ => {
                 // Unknown opcode
