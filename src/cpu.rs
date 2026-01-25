@@ -1,4 +1,5 @@
 use crate::bus::Bus;
+use crate::opcodes::OPCODES;
 
 pub struct Cpu {
     program_counter: u16,
@@ -31,6 +32,67 @@ impl Cpu {
             flag_decimal: false,
             flag_interrupt_disable: false,
         }
+    }
+
+    fn get_operand_mode(&self, opcode: u8) -> u8 {
+        match opcode {
+            // Single Byte Instructions
+            0x00 | 0x08 | 0x18 | 0x20 | 0x28 | 0x38 | 0x40 | 0x48 | 0x58 | 0x60 | 0x68 | 0x78
+            | 0x88 | 0x8A | 0x98 | 0x9A | 0xA8 | 0xAA | 0xB8 | 0xBA | 0xC8 | 0xCA | 0xD8 | 0xE8
+            | 0xEA | 0xF8 | 0x0A | 0x2A | 0x4A | 0x6A => 1,
+
+            // 2 Byte Instructions
+            0x05 | 0x06 | 0x09 | 0x10 | 0x24 | 0x25 | 0x26 | 0x29 | 0x30 | 0x45 | 0x46 | 0x49
+            | 0x50 | 0x65 | 0x66 | 0x69 | 0x70 | 0x84 | 0x85 | 0x86 | 0x90 | 0xA0 | 0xA2 | 0xA5
+            | 0xA9 | 0xB0 | 0xC0 | 0xC4 | 0xC5 | 0xC6 | 0xC9 | 0xD0 | 0xE0 | 0xE4 | 0xE5 | 0xE6
+            | 0xE9 | 0xF0 => 2,
+
+            // 3 Byte Instructions
+            0x0D | 0x0E | 0x2D | 0x2E | 0x4C | 0x4D | 0x4E | 0x6D | 0x6E | 0x8C | 0x8D | 0x8E
+            | 0xAC | 0xAD | 0xAE | 0xCC | 0xCD | 0xCE | 0xEC | 0xED | 0xEE => 3,
+
+            // Any other instructions
+            _ => 1,
+        }
+    }
+
+    pub fn trace(&self, bus: &Bus) -> String {
+        let code = bus.read(self.program_counter);
+        let length = self.get_operand_mode(code);
+
+        let mut hex_dump = vec![];
+        hex_dump.push(code);
+
+        if length > 1 {
+            let mem = bus.read(self.program_counter + 1);
+            hex_dump.push(mem);
+        }
+        if length > 2 {
+            let mem = bus.read(self.program_counter + 2);
+            hex_dump.push(mem);
+        }
+
+        let hex_str = hex_dump
+            .iter()
+            .map(|z| format!("{:02X}", z))
+            .collect::<Vec<String>>()
+            .join(" ");
+
+        let mnemonic = OPCODES[code as usize];
+
+        let status = self.get_status_register(false) | 0x30; // 0x30 sets bit 4 and 5
+
+        format!(
+            "{:04X}  {:8} {: >4} A:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X}",
+            self.program_counter,
+            hex_str,
+            mnemonic,
+            self.a,
+            self.x,
+            self.y,
+            status,
+            self.stack_pointer,
+        )
     }
 
     pub fn reset(&mut self, bus: &Bus) {
@@ -213,9 +275,8 @@ impl Cpu {
 
     pub fn emulate_cpu(&mut self, bus: &mut Bus) {
         let opcode = bus.read(self.program_counter);
-        println!("0x{:02x}", opcode);
         self.program_counter += 1;
-        let mut cycles = 0;
+        let mut _cycles = 0;
 
         match opcode {
             0x00 => {
@@ -231,7 +292,7 @@ impl Cpu {
                 let destination_address_high = bus.read(0xFFFF);
                 self.program_counter =
                     destination_address_high as u16 * 0x100 + destination_address_low as u16;
-                cycles = 7;
+                _cycles = 7;
             }
             0x02 => {
                 // HTL
@@ -241,19 +302,19 @@ impl Cpu {
                 // ORA Zero Page
                 let address = self.read_and_increment(bus);
                 self.bitwise_or(bus, address as u16);
-                cycles = 3;
+                _cycles = 3;
             }
             0x06 => {
                 // ASL Zero Page
                 let address = self.read_and_increment(bus);
                 self.shift_left(bus, address as u16);
-                cycles = 5;
+                _cycles = 5;
             }
             0x08 => {
                 // PHP
                 let status = self.get_status_register(true);
                 self.push(bus, status);
-                cycles = 3;
+                _cycles = 3;
             }
             0x09 => {
                 // ORA Immediate
@@ -261,7 +322,7 @@ impl Cpu {
                 self.a |= value;
                 self.flag_zero = self.a == 0;
                 self.flag_negative = self.a & 0x80 != 0;
-                cycles = 2;
+                _cycles = 2;
             }
             0x0A => {
                 // ASL A
@@ -269,19 +330,19 @@ impl Cpu {
                 self.a <<= 1;
                 self.flag_zero = self.a == 0;
                 self.flag_negative = self.a & 0x80 != 0;
-                cycles = 2;
+                _cycles = 2;
             }
             0x0D => {
                 // ORA Absolute
                 let address = self.read_absolute_addressed(bus);
                 self.bitwise_or(bus, address);
-                cycles = 4;
+                _cycles = 4;
             }
             0x0E => {
                 // ASL Absolute
                 let address = self.read_absolute_addressed(bus);
                 self.shift_left(bus, address);
-                cycles = 6;
+                _cycles = 6;
             }
             0x10 => {
                 // BPL
@@ -293,19 +354,19 @@ impl Cpu {
                     }
                     let new_program_counter = self.program_counter + signed_offset as u16;
                     if new_program_counter & 0xff00 == self.program_counter & 0xff00 {
-                        cycles = 3;
+                        _cycles = 3;
                     } else {
-                        cycles = 4;
+                        _cycles = 4;
                     }
                     self.program_counter = new_program_counter;
                 } else {
-                    cycles = 2;
+                    _cycles = 2;
                 }
             }
             0x18 => {
                 // CLC
                 self.flag_carry = false;
-                cycles = 2;
+                _cycles = 2;
             }
             0x20 => {
                 // JSR
@@ -316,7 +377,7 @@ impl Cpu {
                 self.push(bus, self.program_counter as u8);
                 self.program_counter =
                     destination_address_high as u16 * 0x100 + destination_address_low as u16;
-                cycles = 6;
+                _cycles = 6;
             }
             0x24 => {
                 // BIT Zero Page
@@ -328,19 +389,19 @@ impl Cpu {
                 // AND Zero Page
                 let address = self.read_and_increment(bus);
                 self.bitwise_and(bus, address as u16);
-                cycles = 3;
+                _cycles = 3;
             }
             0x26 => {
                 // ROL Zero Page
                 let address = self.read_and_increment(bus);
                 self.rotate_left(bus, address as u16);
-                cycles = 5;
+                _cycles = 5;
             }
             0x28 => {
                 // PLP
                 let status = self.pull(bus);
                 self.set_status_register(status);
-                cycles = 4;
+                _cycles = 4;
             }
             0x29 => {
                 // AND Immediate
@@ -348,7 +409,7 @@ impl Cpu {
                 self.a &= value;
                 self.flag_zero = self.a == 0;
                 self.flag_negative = self.a & 0x80 != 0;
-                cycles = 2;
+                _cycles = 2;
             }
             0x2A => {
                 // ROL A
@@ -360,7 +421,7 @@ impl Cpu {
                 }
                 self.flag_zero = self.a == 0;
                 self.flag_negative = self.a & 0x80 != 0;
-                cycles = 2;
+                _cycles = 2;
             }
             0x2C => {
                 // BIT Absolute
@@ -372,13 +433,13 @@ impl Cpu {
                 // AND Absolute
                 let address = self.read_absolute_addressed(bus);
                 self.bitwise_and(bus, address);
-                cycles = 4;
+                _cycles = 4;
             }
             0x2E => {
                 // ROL Absolute
                 let address = self.read_absolute_addressed(bus);
                 self.rotate_left(bus, address);
-                cycles = 6;
+                _cycles = 6;
             }
             0x30 => {
                 // BMI
@@ -390,19 +451,19 @@ impl Cpu {
                     }
                     let new_program_counter = self.program_counter + signed_offset as u16;
                     if new_program_counter & 0xff00 == self.program_counter & 0xff00 {
-                        cycles = 3;
+                        _cycles = 3;
                     } else {
-                        cycles = 4;
+                        _cycles = 4;
                     }
                     self.program_counter = new_program_counter;
                 } else {
-                    cycles = 2;
+                    _cycles = 2;
                 }
             }
             0x38 => {
                 // SEC
                 self.flag_carry = true;
-                cycles = 2;
+                _cycles = 2;
             }
             0x40 => {
                 // RTI
@@ -412,24 +473,24 @@ impl Cpu {
                 let return_address_low = self.pull(bus);
                 let return_address_high = self.pull(bus);
                 self.program_counter = return_address_high as u16 * 256 + return_address_low as u16;
-                cycles = 6;
+                _cycles = 6;
             }
             0x45 => {
                 // EOR Zero Page
                 let address = self.read_and_increment(bus);
                 self.bitwise_eor(bus, address as u16);
-                cycles = 3;
+                _cycles = 3;
             }
             0x46 => {
                 // LSR Zero Page
                 let address = self.read_and_increment(bus);
                 self.shift_right(bus, address as u16);
-                cycles = 5;
+                _cycles = 5;
             }
             0x48 => {
                 // PHA
                 self.push(bus, self.a);
-                cycles = 3;
+                _cycles = 3;
             }
             0x49 => {
                 // EOR Immediate
@@ -437,7 +498,7 @@ impl Cpu {
                 self.a ^= value;
                 self.flag_zero = self.a == 0;
                 self.flag_negative = self.a & 0x80 != 0;
-                cycles = 2;
+                _cycles = 2;
             }
             0x4A => {
                 // LSR A
@@ -445,24 +506,24 @@ impl Cpu {
                 self.a >>= 1;
                 self.flag_zero = self.a == 0;
                 self.flag_negative = self.a & 0x80 != 0;
-                cycles = 2;
+                _cycles = 2;
             }
             0x4C => {
                 // JMP
                 self.program_counter = self.read_absolute_addressed(bus);
-                cycles = 3;
+                _cycles = 3;
             }
             0x4D => {
                 // EOR Absolute
                 let address = self.read_absolute_addressed(bus);
                 self.bitwise_eor(bus, address);
-                cycles = 3;
+                _cycles = 3;
             }
             0x4E => {
                 // LSR Absolute
                 let address = self.read_absolute_addressed(bus);
                 self.shift_right(bus, address);
-                cycles = 6;
+                _cycles = 6;
             }
             0x50 => {
                 // BVC
@@ -474,19 +535,19 @@ impl Cpu {
                     }
                     let new_program_counter = self.program_counter + signed_offset as u16;
                     if new_program_counter & 0xff00 == self.program_counter & 0xff00 {
-                        cycles = 3;
+                        _cycles = 3;
                     } else {
-                        cycles = 4;
+                        _cycles = 4;
                     }
                     self.program_counter = new_program_counter;
                 } else {
-                    cycles = 2;
+                    _cycles = 2;
                 }
             }
             0x58 => {
                 // CLI
                 self.flag_interrupt_disable = false;
-                cycles = 2;
+                _cycles = 2;
             }
             0x60 => {
                 // RTS
@@ -494,33 +555,33 @@ impl Cpu {
                 let return_address_high = self.pull(bus);
                 self.program_counter = return_address_high as u16 * 256 + return_address_low as u16;
                 self.program_counter += 1;
-                cycles = 6;
+                _cycles = 6;
             }
             0x65 => {
                 // ADC Zero Page
                 let address = self.read_and_increment(bus);
                 let value = bus.read(address as u16);
                 self.add_carry(value);
-                cycles = 3;
+                _cycles = 3;
             }
             0x66 => {
                 // ROR Zero Page
                 let address = self.read_and_increment(bus);
                 self.rotate_right(bus, address as u16);
-                cycles = 5;
+                _cycles = 5;
             }
             0x68 => {
                 // PLA
                 self.a = self.pull(bus);
                 self.flag_zero = self.a == 0;
                 self.flag_negative = self.a >= 0x80;
-                cycles = 4;
+                _cycles = 4;
             }
             0x69 => {
                 // ADC Immediate
                 let address = self.read_and_increment(bus);
                 self.add_carry(address);
-                cycles = 2;
+                _cycles = 2;
             }
             0x6A => {
                 // ROR A
@@ -532,20 +593,20 @@ impl Cpu {
                 }
                 self.flag_zero = self.a == 0;
                 self.flag_negative = self.a & 0x80 != 0;
-                cycles = 2;
+                _cycles = 2;
             }
             0x6D => {
                 // ADC Absolute
                 let address = self.read_absolute_addressed(bus);
                 let value = bus.read(address);
                 self.add_carry(value);
-                cycles = 4;
+                _cycles = 4;
             }
             0x6E => {
                 // ROR Absolute
                 let address = self.read_absolute_addressed(bus);
                 self.rotate_right(bus, address);
-                cycles = 6;
+                _cycles = 6;
             }
             0x70 => {
                 // BVS
@@ -557,69 +618,69 @@ impl Cpu {
                     }
                     let new_program_counter = self.program_counter + signed_offset as u16;
                     if new_program_counter & 0xff00 == self.program_counter & 0xff00 {
-                        cycles = 3;
+                        _cycles = 3;
                     } else {
-                        cycles = 4;
+                        _cycles = 4;
                     }
                     self.program_counter = new_program_counter;
                 } else {
-                    cycles = 2;
+                    _cycles = 2;
                 }
             }
             0x78 => {
                 // SEI
                 self.flag_interrupt_disable = true;
-                cycles = 2;
+                _cycles = 2;
             }
             0x84 => {
                 // STY Zero Page
                 let destination_address = self.read_and_increment(bus);
                 bus.write(destination_address as u16, self.y);
-                cycles = 3;
+                _cycles = 3;
             }
             0x85 => {
                 // STA Zero Page
                 let destination_address = self.read_and_increment(bus);
                 bus.write(destination_address as u16, self.a);
-                cycles = 3;
+                _cycles = 3;
             }
             0x86 => {
                 // STX Zero Page
                 let destination_address = self.read_and_increment(bus);
                 bus.write(destination_address as u16, self.x);
-                cycles = 3;
+                _cycles = 3;
             }
             0x88 => {
                 // DEY
                 self.y = self.y.wrapping_sub(1);
                 self.flag_zero = self.y == 0;
                 self.flag_negative = self.y & 0x80 != 0;
-                cycles = 2;
+                _cycles = 2;
             }
             0x8A => {
                 // TXA
                 self.a = self.x;
                 self.flag_zero = self.a == 0;
                 self.flag_negative = self.a & 0x80 != 0;
-                cycles = 2;
+                _cycles = 2;
             }
             0x8C => {
                 // STY Absolute
                 let destination_address = self.read_absolute_addressed(bus);
                 bus.write(destination_address, self.y);
-                cycles = 4;
+                _cycles = 4;
             }
             0x8D => {
                 // STA Absolute
                 let destination_address = self.read_absolute_addressed(bus);
                 bus.write(destination_address, self.a);
-                cycles = 4;
+                _cycles = 4;
             }
             0x8E => {
                 // STX Absolute
                 let destination_address = self.read_absolute_addressed(bus);
                 bus.write(destination_address, self.x);
-                cycles = 4;
+                _cycles = 4;
             }
             0x90 => {
                 // BCC
@@ -631,13 +692,13 @@ impl Cpu {
                     }
                     let new_program_counter = self.program_counter + signed_offset as u16;
                     if new_program_counter & 0xff00 == self.program_counter & 0xff00 {
-                        cycles = 3;
+                        _cycles = 3;
                     } else {
-                        cycles = 4;
+                        _cycles = 4;
                     }
                     self.program_counter = new_program_counter;
                 } else {
-                    cycles = 2;
+                    _cycles = 2;
                 }
             }
             0x98 => {
@@ -645,26 +706,26 @@ impl Cpu {
                 self.a = self.y;
                 self.flag_zero = self.a == 0;
                 self.flag_negative = self.a & 0x80 != 0;
-                cycles = 2;
+                _cycles = 2;
             }
             0x9A => {
                 // TXS
                 self.stack_pointer = self.x;
-                cycles = 2;
+                _cycles = 2;
             }
             0xA0 => {
                 // LDY Immediate
                 self.y = self.read_and_increment(bus);
                 self.flag_zero = self.y == 0;
                 self.flag_negative = self.y & 0x80 != 0;
-                cycles = 2;
+                _cycles = 2;
             }
             0xA2 => {
                 // LDX Immediate
                 self.x = self.read_and_increment(bus);
                 self.flag_zero = self.x == 0;
                 self.flag_negative = self.x & 0x80 != 0;
-                cycles = 2;
+                _cycles = 2;
             }
             0xA5 => {
                 // LDA Zero Page
@@ -672,28 +733,28 @@ impl Cpu {
                 self.a = bus.read(destination_address as u16);
                 self.flag_zero = self.a == 0;
                 self.flag_negative = self.a & 0x80 != 0;
-                cycles = 3;
+                _cycles = 3;
             }
             0xA8 => {
                 // TAY
                 self.y = self.a;
                 self.flag_zero = self.y == 0;
                 self.flag_negative = self.y & 0x80 != 0;
-                cycles = 2;
+                _cycles = 2;
             }
             0xA9 => {
                 // LDA Immediate
                 self.a = self.read_and_increment(bus);
                 self.flag_zero = self.a == 0;
                 self.flag_negative = self.a & 0x80 != 0;
-                cycles = 2;
+                _cycles = 2;
             }
             0xAA => {
                 // TAX
                 self.x = self.a;
                 self.flag_zero = self.x == 0;
                 self.flag_negative = self.x & 0x80 != 0;
-                cycles = 2;
+                _cycles = 2;
             }
             0xAD => {
                 // LDA Absolute
@@ -701,7 +762,7 @@ impl Cpu {
                 self.a = bus.read(destination_address);
                 self.flag_zero = self.a == 0;
                 self.flag_negative = self.a & 0x80 != 0;
-                cycles = 4;
+                _cycles = 4;
             }
             0xB0 => {
                 // BCS
@@ -713,92 +774,92 @@ impl Cpu {
                     }
                     let new_program_counter = self.program_counter + signed_offset as u16;
                     if new_program_counter & 0xff00 == self.program_counter & 0xff00 {
-                        cycles = 3;
+                        _cycles = 3;
                     } else {
-                        cycles = 4;
+                        _cycles = 4;
                     }
                     self.program_counter = new_program_counter;
                 } else {
-                    cycles = 2;
+                    _cycles = 2;
                 }
             }
             0xB8 => {
                 // CLV
                 self.flag_overflow = false;
-                cycles = 2;
+                _cycles = 2;
             }
             0xBA => {
                 // TSX
                 self.x = self.stack_pointer;
                 self.flag_zero = self.x == 0;
                 self.flag_negative = self.x & 0x80 != 0;
-                cycles = 2;
+                _cycles = 2;
             }
             0xC0 => {
                 // CPY Immediate
                 let value = self.read_and_increment(bus);
                 self.compare_y(value);
-                cycles = 2;
+                _cycles = 2;
             }
             0xC4 => {
                 // CPY Zero Page
                 let address = self.read_and_increment(bus);
                 let value = bus.read(address as u16);
                 self.compare_y(value);
-                cycles = 3;
+                _cycles = 3;
             }
             0xC5 => {
                 // CMP Zero Page
                 let address = self.read_and_increment(bus);
                 let value = bus.read(address as u16);
                 self.compare_a(value);
-                cycles = 3;
+                _cycles = 3;
             }
             0xC6 => {
                 // DEC Zero Page
                 let address = self.read_and_increment(bus);
                 self.decrement(bus, address as u16);
-                cycles = 5;
+                _cycles = 5;
             }
             0xC8 => {
                 // INY
                 self.y = self.y.wrapping_add(1);
                 self.flag_zero = self.y == 0;
                 self.flag_negative = self.y & 0x80 != 0;
-                cycles = 2;
+                _cycles = 2;
             }
             0xC9 => {
                 // CMP Immediate
                 let value = self.read_and_increment(bus);
                 self.compare_a(value);
-                cycles = 2;
+                _cycles = 2;
             }
             0xCA => {
                 // DEX
                 self.x = self.x.wrapping_sub(1);
                 self.flag_zero = self.x == 0;
                 self.flag_negative = self.x & 0x80 != 0;
-                cycles = 2;
+                _cycles = 2;
             }
             0xCC => {
                 // CPY Absolute
                 let address = self.read_absolute_addressed(bus);
                 let value = bus.read(address);
                 self.compare_y(value);
-                cycles = 4;
+                _cycles = 4;
             }
             0xCD => {
                 // CMP Absolute
                 let address = self.read_absolute_addressed(bus);
                 let value = bus.read(address);
                 self.compare_a(value);
-                cycles = 4;
+                _cycles = 4;
             }
             0xCE => {
                 // DEC Absolute
                 let address = self.read_absolute_addressed(bus);
                 self.decrement(bus, address);
-                cycles = 6;
+                _cycles = 6;
             }
             0xD0 => {
                 // BNE
@@ -810,82 +871,82 @@ impl Cpu {
                     }
                     let new_program_counter = self.program_counter + signed_offset as u16;
                     if new_program_counter & 0xff00 == self.program_counter & 0xff00 {
-                        cycles = 3;
+                        _cycles = 3;
                     } else {
-                        cycles = 4;
+                        _cycles = 4;
                     }
                     self.program_counter = new_program_counter;
                 } else {
-                    cycles = 2;
+                    _cycles = 2;
                 }
             }
             0xD8 => {
                 // CLD
                 self.flag_decimal = false;
-                cycles = 2;
+                _cycles = 2;
             }
             0xE0 => {
                 // CPX Immediate
                 let value = self.read_and_increment(bus);
                 self.compare_x(value);
-                cycles = 2;
+                _cycles = 2;
             }
             0xE4 => {
                 // CPX Zero Page
                 let address = self.read_and_increment(bus);
                 let value = bus.read(address as u16);
                 self.compare_x(value);
-                cycles = 3;
+                _cycles = 3;
             }
             0xEC => {
                 // CPX Absolute
                 let address = self.read_absolute_addressed(bus);
                 let value = bus.read(address);
                 self.compare_x(value);
-                cycles = 4;
+                _cycles = 4;
             }
             0xE5 => {
                 // SBC Zero Page
                 let address = self.read_and_increment(bus);
                 let value = bus.read(address as u16);
                 self.sub_carry(value);
-                cycles = 3;
+                _cycles = 3;
             }
             0xE6 => {
                 // INC Zero Page
                 let address = self.read_and_increment(bus);
                 self.increment(bus, address as u16);
-                cycles = 5;
+                _cycles = 5;
             }
             0xE8 => {
                 // INX
                 self.x = self.x.wrapping_add(1);
                 self.flag_zero = self.x == 0;
                 self.flag_negative = self.x & 0x80 != 0;
-                cycles = 2;
+                _cycles = 2;
             }
             0xE9 => {
                 // SBC Immediate
                 let value = self.read_and_increment(bus);
                 self.sub_carry(value);
-                cycles = 2;
+                _cycles = 2;
             }
             0xEA => {
                 // NOP
-                cycles = 2;
+                _cycles = 2;
             }
             0xED => {
                 // SBC Absolute
                 let address = self.read_absolute_addressed(bus);
                 let value = bus.read(address);
                 self.sub_carry(value);
-                cycles = 4;
+                _cycles = 4;
             }
             0xEE => {
                 // INC Absolute
                 let address = self.read_absolute_addressed(bus);
                 self.increment(bus, address);
-                cycles = 6;
+                _cycles = 6;
             }
             0xF0 => {
                 // BEQ
@@ -897,25 +958,24 @@ impl Cpu {
                     }
                     let new_program_counter = self.program_counter + signed_offset as u16;
                     if new_program_counter & 0xff00 == self.program_counter & 0xff00 {
-                        cycles = 3;
+                        _cycles = 3;
                     } else {
-                        cycles = 4;
+                        _cycles = 4;
                     }
                     self.program_counter = new_program_counter;
                 } else {
-                    cycles = 2;
+                    _cycles = 2;
                 }
             }
             0xF8 => {
                 // SED
                 self.flag_decimal = true;
-                cycles = 2;
+                _cycles = 2;
             }
             _ => {
                 // Unknown opcode
                 panic!("Unknown opcode {}", opcode)
             }
         }
-        println!("{} cycles used", cycles)
     }
 }
