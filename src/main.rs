@@ -1,10 +1,11 @@
+use image::ColorType::Rgb8;
 use nintendrust::bus::Bus;
 use nintendrust::cpu::Cpu;
 use nintendrust::rom::Rom;
 use std::fs;
 
 fn main() {
-    let file_path = "6_Instructions2.nes";
+    let file_path = "Super Mario Bros. 3 (USA).nes";
     let raw_bytes = match fs::read(file_path) {
         Ok(bytes) => bytes,
         Err(e) => {
@@ -13,23 +14,17 @@ fn main() {
         }
     };
 
-    let rom = match Rom::new(&raw_bytes) {
-        Ok(r) => r,
-        Err(e) => {
-            eprintln!("ROM Error: {}", e);
-            return;
-        }
-    };
+    let rom = Rom::new(&raw_bytes);
 
-    let mut bus = Bus::new();
+    let mut bus = Bus::new(rom);
     let mut cpu = Cpu::new();
-
-    bus.insert_cartridge(rom);
+    let frame = bus.ppu.debug_draw_pattern_tables();
+    image::save_buffer("pattern_tables.png", &frame, 256, 128, Rgb8).expect("Failed to save image");
 
     cpu.reset(&mut bus);
 
-    while !cpu.halted {
-        println!("{}", cpu.trace(&bus));
-        cpu.emulate_cpu(&mut bus);
-    }
+    // while !cpu.halted {
+    //     println!("{}", cpu.trace(&bus));
+    //     cpu.emulate_cpu(&mut bus);
+    // }
 }

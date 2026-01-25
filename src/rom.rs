@@ -1,3 +1,4 @@
+#[derive(Clone)]
 pub enum Mirroring {
     Vertical,
     Horizontal,
@@ -13,16 +14,16 @@ pub struct Rom {
 }
 
 impl Rom {
-    pub fn new(raw_bytes: &Vec<u8>) -> Result<Self, String> {
+    pub fn new(raw_bytes: &Vec<u8>) -> Self {
         if raw_bytes.len() < 16 {
-            return Err("File is too small".to_string());
+            panic!("File is too small");
         }
 
         let mut header = [0u8; 16];
         header.copy_from_slice(&raw_bytes[0..16]);
 
         if &header[0..4] != b"NES\x1a" {
-            return Err("Not valid iNES file".to_string());
+            panic!("Not valid iNES file");
         }
 
         let prg_rom_size = header[4] as usize * 16384;
@@ -33,11 +34,10 @@ impl Rom {
 
         let prg_rom_start = 16;
         let prg_rom_end = prg_rom_start + prg_rom_size;
-
         let chr_rom_start = prg_rom_end;
         let chr_rom_end = chr_rom_start + chr_rom_size;
 
-        let prg_rom = raw_bytes[chr_rom_start..chr_rom_end].to_vec();
+        let prg_rom = raw_bytes[prg_rom_start..prg_rom_end].to_vec();
         let chr_rom = raw_bytes[chr_rom_start..chr_rom_end].to_vec();
 
         let mapper = (flags_7 & 0xF0) | (flags_6 >> 4);
@@ -48,12 +48,12 @@ impl Rom {
             Mirroring::Horizontal
         };
 
-        Ok(Rom {
+        Rom {
             header,
             prg_rom,
             chr_rom,
             mapper,
             screen_mirroring,
-        })
+        }
     }
 }
