@@ -156,6 +156,7 @@ impl Ppu {
 
     pub fn read_register(&self, address: u16) -> u8 {
         match address {
+            0x2002 => 0x80, // PPU STATUS
             0x2007 => 0,
             _ => 0,
         }
