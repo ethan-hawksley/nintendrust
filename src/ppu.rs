@@ -1,17 +1,23 @@
-use crate::rom::Mirroring;
-
 pub struct Ppu {
+    header: [u8; 16],
     pub chr_rom: Vec<u8>,
-    pub mirroring: Mirroring,
     pub internal_data_buf: u8,
+    write_latch: bool,
+    temporary_vram_address: u16,
+    transfer_address: u16,
+    vram_address: u16,
 }
 
 impl Ppu {
-    pub fn new(chr_rom: Vec<u8>, mirroring: Mirroring) -> Self {
+    pub fn new(header: [u8; 16], chr_rom: Vec<u8>) -> Self {
         Ppu {
+            header,
             chr_rom,
-            mirroring,
             internal_data_buf: 0,
+            write_latch: false,
+            temporary_vram_address: 0,
+            transfer_address: 0,
+            vram_address: 0,
         }
     }
 
@@ -57,6 +63,29 @@ impl Ppu {
             }
         }
         frame_buffer
+    }
+
+    pub fn ppu_data(&mut self, value: u8) {
+        match self.vram_address {
+            ..0x2000 => {
+                // If the CHR ROM is 0-length, it can be used as CHR RAM
+                if self.header[5] == 0 {
+                    self.chr_rom[self.vram_address as usize] = value;
+                }
+            }
+            0x2000..0x3F00 => {}
+            _ => {}
+        }
+    }
+
+    pub fn ppu_addr(&mut self, value: u8) {
+        if !self.write_latch {
+            self.temporary_vram_address = ((value & 0x3F) as u16) << 8;
+        } else {
+            self.vram_address = self.temporary_vram_address | value as u16;
+            self.transfer_address = self.vram_address;
+        }
+        self.write_latch = !self.write_latch;
     }
 
     pub fn read_register(&mut self, addr: u16) -> u8 {

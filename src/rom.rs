@@ -1,16 +1,8 @@
-#[derive(Clone)]
-pub enum Mirroring {
-    Vertical,
-    Horizontal,
-    FourScreen,
-}
-
 pub struct Rom {
     pub header: [u8; 16],
     pub prg_rom: Vec<u8>,
     pub chr_rom: Vec<u8>,
     pub mapper: u8,
-    pub screen_mirroring: Mirroring,
 }
 
 impl Rom {
@@ -42,18 +34,11 @@ impl Rom {
 
         let mapper = (flags_7 & 0xF0) | (flags_6 >> 4);
 
-        let screen_mirroring = if (flags_6 & 1) != 0 {
-            Mirroring::Vertical
-        } else {
-            Mirroring::Horizontal
-        };
-
         Rom {
             header,
             prg_rom,
             chr_rom,
             mapper,
-            screen_mirroring,
         }
     }
 }

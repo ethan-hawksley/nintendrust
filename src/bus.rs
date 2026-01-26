@@ -9,7 +9,7 @@ pub struct Bus {
 
 impl Bus {
     pub fn new(rom: Rom) -> Self {
-        let ppu = Ppu::new(rom.chr_rom.clone(), rom.screen_mirroring.clone());
+        let ppu = Ppu::new(rom.header.clone(), rom.chr_rom.clone());
 
         Bus {
             ram: [0; 0x800],
@@ -33,10 +33,31 @@ impl Bus {
         }
     }
 
-    pub fn write(&mut self, addr: u16, value: u8) {
-        match addr {
-            0x0000..=0x1FFF => self.ram[(addr & 0x07FF) as usize] = value,
-            _ => todo!("Unimplemented memory access {}", addr),
+    pub fn write(&mut self, address: u16, value: u8) {
+        match address {
+            0x0000..=0x1FFF => self.ram[(address & 0x07FF) as usize] = value,
+            0x2000..=0x3FFF => {
+                let ppu_address = address & 0x2007;
+                match ppu_address {
+                    0x2000 => {}
+                    0x2001 => {}
+                    0x2002 => {}
+                    0x2003 => {}
+                    0x2004 => {}
+                    0x2005 => {}
+                    0x2006 => {
+                        // PPUADDR
+                        self.ppu.ppu_addr(value);
+                    }
+                    0x2007 => {
+                        // PPUDATA
+                    }
+                    _ => {
+                        todo!("Unimplemented ppu access {}", ppu_address)
+                    }
+                }
+            }
+            _ => todo!("Unimplemented memory access {}", address),
         }
     }
 }
