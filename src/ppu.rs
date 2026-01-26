@@ -1,23 +1,42 @@
+use crate::cartridge::CartridgeInfo;
+use crate::cartridge::Mirroring::FourScreen;
+use crate::cartridge::Mirroring::Horizontal;
+use crate::cartridge::Mirroring::Vertical;
+
 pub struct Ppu {
-    header: [u8; 16],
-    pub chr_rom: Vec<u8>,
-    pub internal_data_buf: u8,
+    cartridge_info: CartridgeInfo,
+    chr_memory: Vec<u8>,
+    chr_is_ram: bool,
+    vram: [u8; 2048],
+    palette_ram: [u8; 32],
+    oam: [u8; 256],
+    internal_data_buf: u8,
     write_latch: bool,
+    vram_address: u16,
     temporary_vram_address: u16,
     transfer_address: u16,
-    vram_address: u16,
 }
 
 impl Ppu {
-    pub fn new(header: [u8; 16], chr_rom: Vec<u8>) -> Self {
+    pub fn new(cartridge_info: CartridgeInfo, chr_rom: Vec<u8>) -> Self {
+        let (chr_memory, chr_is_ram) = if chr_rom.is_empty() {
+            (vec![0; 8192], true)
+        } else {
+            (chr_rom, false)
+        };
+
         Ppu {
-            header,
-            chr_rom,
+            cartridge_info,
+            chr_memory,
+            chr_is_ram,
+            vram: [0; 2048],
+            palette_ram: [0; 32],
+            oam: [0; 256],
             internal_data_buf: 0,
             write_latch: false,
+            vram_address: 0,
             temporary_vram_address: 0,
             transfer_address: 0,
-            vram_address: 0,
         }
     }
 
@@ -34,13 +53,13 @@ impl Ppu {
                     let tile_n = tile_y * 16 + tile_x;
                     let offset = table * 4096 + tile_n * 16;
 
-                    if offset + 16 > self.chr_rom.len() {
+                    if offset + 16 > self.chr_memory.len() {
                         continue;
                     }
 
                     for row in 0..8 {
-                        let tile_lsb = self.chr_rom[offset + row];
-                        let tile_msb = self.chr_rom[offset + row + 8];
+                        let tile_lsb = self.chr_memory[offset + row];
+                        let tile_msb = self.chr_memory[offset + row + 8];
 
                         for col in 0..8 {
                             let mask = 1 << (7 - col);
@@ -69,11 +88,18 @@ impl Ppu {
         match self.vram_address {
             ..0x2000 => {
                 // If the CHR ROM is 0-length, it can be used as CHR RAM
-                if self.header[5] == 0 {
-                    self.chr_rom[self.vram_address as usize] = value;
+                if self.chr_is_ram {
+                    self.chr_memory[self.vram_address as usize] = value;
                 }
             }
-            0x2000..0x3F00 => {}
+            0x2000..0x3F00 => match self.cartridge_info.mirroring {
+                Horizontal => {
+                }
+                Vertical => {}
+                FourScreen => {
+                    todo!("FourScreen mirroring");
+                }
+            },
             _ => {}
         }
     }

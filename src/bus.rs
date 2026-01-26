@@ -9,7 +9,7 @@ pub struct Bus {
 
 impl Bus {
     pub fn new(rom: Rom) -> Self {
-        let ppu = Ppu::new(rom.header.clone(), rom.chr_rom.clone());
+        let ppu = Ppu::new(rom.cartridge_info.clone(), rom.chr_rom.clone());
 
         Bus {
             ram: [0; 0x800],

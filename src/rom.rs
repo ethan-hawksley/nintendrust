@@ -1,8 +1,10 @@
+use crate::cartridge::CartridgeInfo;
+
 pub struct Rom {
-    pub header: [u8; 16],
     pub prg_rom: Vec<u8>,
     pub chr_rom: Vec<u8>,
     pub mapper: u8,
+    pub cartridge_info: CartridgeInfo,
 }
 
 impl Rom {
@@ -34,11 +36,13 @@ impl Rom {
 
         let mapper = (flags_7 & 0xF0) | (flags_6 >> 4);
 
+        let cartridge_info = CartridgeInfo::from_header(&header);
+
         Rom {
-            header,
             prg_rom,
             chr_rom,
             mapper,
+            cartridge_info,
         }
     }
 }
