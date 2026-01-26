@@ -23,8 +23,8 @@ fn main() {
 
     cpu.reset(&mut bus);
 
-    // while !cpu.halted {
-    //     println!("{}", cpu.trace(&bus));
-    //     cpu.emulate_cpu(&mut bus);
-    // }
+    while !cpu.halted {
+        println!("{}", cpu.trace(&bus));
+        cpu.emulate_cpu(&mut bus);
+    }
 }

@@ -86,6 +86,62 @@ impl Ppu {
         frame_buffer
     }
 
+    pub fn debug_draw_nametable(&self) -> Vec<u8> {
+        // Draw 2 nametables side by side
+        // Each nametable is 256x240 pixels (32x30 tiles of 8x8 pixels)
+        let width = 512;
+        let height = 240;
+        let mut frame_buffer = vec![0; width * height * 3];
+
+        let palette = [(0, 0, 0), (85, 85, 85), (170, 170, 170), (255, 255, 255)];
+
+        for nametable in 0..2u16 {
+            let nametable_base = 0x2000 + nametable * 0x400;
+            let screen_offset_x = nametable as usize * 256;
+
+            for tile_y in 0..30usize {
+                for tile_x in 0..32usize {
+                    // Get tile index from nametable in VRAM
+                    let nametable_addr = nametable_base + (tile_y * 32 + tile_x) as u16;
+                    let mapped_addr = self.map_vram_address(nametable_addr);
+                    let tile_index = self.vram[mapped_addr] as usize;
+
+                    // Get tile from pattern table 0
+                    // TODO: Use PPUCTRL bit 4 to select pattern table
+                    let chr_offset = tile_index * 16;
+
+                    for row in 0..8usize {
+                        if chr_offset + row + 8 >= self.chr_memory.len() {
+                            continue;
+                        }
+
+                        let tile_lsb = self.chr_memory[chr_offset + row];
+                        let tile_msb = self.chr_memory[chr_offset + row + 8];
+
+                        for col in 0..8usize {
+                            let mask = 1 << (7 - col);
+                            let lsb = if tile_lsb & mask != 0 { 1 } else { 0 };
+                            let msb = if tile_msb & mask != 0 { 2 } else { 0 };
+                            let val = msb | lsb;
+
+                            let (r, g, b) = palette[val];
+
+                            let pixel_x = screen_offset_x + tile_x * 8 + col;
+                            let pixel_y = tile_y * 8 + row;
+
+                            let index = (pixel_y * width + pixel_x) * 3;
+                            frame_buffer[index] = r;
+                            frame_buffer[index + 1] = g;
+                            frame_buffer[index + 2] = b;
+                        }
+                    }
+                }
+            }
+        }
+
+        frame_buffer
+    }
+
     fn map_vram_address(&self, addr: u16) -> usize {
         let mirrored_addr = addr & 0x0FFF;
 
@@ -94,6 +150,27 @@ impl Ppu {
             Vertical => (mirrored_addr & 0x7FF) as usize,
             FourScreen => {
                 todo!("FourScreen mirroring");
+            }
+        }
+    }
+
+    pub fn write_register(&mut self, address: u16, value: u8) {
+        match address {
+            0x2000 => {}
+            0x2001 => {}
+            0x2002 => {}
+            0x2003 => {}
+            0x2004 => {}
+            0x2005 => {}
+            0x2006 => {
+                // PPUADDR
+                self.ppu_addr(value);
+            }
+            0x2007 => {
+                // PPUDATA
+            }
+            _ => {
+                todo!("Unimplemented ppu register write 0x{:04X}", address);
             }
         }
     }
@@ -137,12 +214,6 @@ impl Ppu {
     pub fn read_register(&mut self, addr: u16) -> u8 {
         match addr {
             _ => 0,
-        }
-    }
-
-    pub fn write_register(&mut self, addr: u16, _data: u8) {
-        match addr {
-            _ => {}
         }
     }
 }

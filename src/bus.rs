@@ -29,7 +29,7 @@ impl Bus {
                     panic!("Indexed ROM out of bounds {}", rom_index);
                 }
             }
-            _ => todo!("Unimplemented memory access {}", addr),
+            _ => todo!("Unimplemented memory access {:02X}", addr),
         }
     }
 
@@ -38,24 +38,7 @@ impl Bus {
             0x0000..=0x1FFF => self.ram[(address & 0x07FF) as usize] = value,
             0x2000..=0x3FFF => {
                 let ppu_address = address & 0x2007;
-                match ppu_address {
-                    0x2000 => {}
-                    0x2001 => {}
-                    0x2002 => {}
-                    0x2003 => {}
-                    0x2004 => {}
-                    0x2005 => {}
-                    0x2006 => {
-                        // PPUADDR
-                        self.ppu.ppu_addr(value);
-                    }
-                    0x2007 => {
-                        // PPUDATA
-                    }
-                    _ => {
-                        todo!("Unimplemented ppu access {}", ppu_address)
-                    }
-                }
+                self.ppu.write_register(ppu_address, value);
             }
             _ => todo!("Unimplemented memory access {}", address),
         }
