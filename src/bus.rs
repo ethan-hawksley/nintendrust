@@ -21,6 +21,7 @@ impl Bus {
     pub fn read(&self, addr: u16) -> u8 {
         match addr {
             0x0000..=0x1FFF => self.ram[(addr & 0x07FF) as usize],
+            0x2000..=0x3FFF => self.ppu.read_register(addr & 0x2007),
             0x8000.. => {
                 let rom_index = (addr - 0x8000) as usize;
                 if rom_index < self.rom.prg_rom.len() {

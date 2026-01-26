@@ -154,6 +154,13 @@ impl Ppu {
         }
     }
 
+    pub fn read_register(&self, address: u16) -> u8 {
+        match address {
+            0x2007 => 0,
+            _ => 0,
+        }
+    }
+
     pub fn write_register(&mut self, address: u16, value: u8) {
         match address {
             0x2000 => {}
@@ -209,11 +216,5 @@ impl Ppu {
             self.transfer_address = self.vram_address;
         }
         self.write_latch = !self.write_latch;
-    }
-
-    pub fn read_register(&mut self, addr: u16) -> u8 {
-        match addr {
-            _ => 0,
-        }
     }
 }
