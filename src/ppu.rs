@@ -15,6 +15,7 @@ pub struct Ppu {
     vram_address: u16,
     temporary_vram_address: u16,
     transfer_address: u16,
+    vram_increment_32: bool,
 }
 
 impl Ppu {
@@ -37,6 +38,7 @@ impl Ppu {
             vram_address: 0,
             temporary_vram_address: 0,
             transfer_address: 0,
+            vram_increment_32: false,
         }
     }
 
@@ -84,6 +86,18 @@ impl Ppu {
         frame_buffer
     }
 
+    fn map_vram_address(&self, addr: u16) -> usize {
+        let mirrored_addr = addr & 0x0FFF;
+
+        match self.cartridge_info.mirroring {
+            Horizontal => ((mirrored_addr & 0x3FF) | ((mirrored_addr >> 1) & 0x400)) as usize,
+            Vertical => (mirrored_addr & 0x7FF) as usize,
+            FourScreen => {
+                todo!("FourScreen mirroring");
+            }
+        }
+    }
+
     pub fn ppu_data(&mut self, value: u8) {
         match self.vram_address {
             ..0x2000 => {
@@ -92,16 +106,22 @@ impl Ppu {
                     self.chr_memory[self.vram_address as usize] = value;
                 }
             }
-            0x2000..0x3F00 => match self.cartridge_info.mirroring {
-                Horizontal => {
+            0x2000..0x3F00 => {
+                let mapped_vram_index = self.map_vram_address(self.vram_address);
+                self.vram[mapped_vram_index] = value;
+            }
+            _ => {
+                if (self.vram_address & 0x03) == 0 {
+                    self.palette_ram[(self.vram_address & 0x0F) as usize] = value;
+                } else {
+                    self.palette_ram[(self.vram_address & 0x1F) as usize] = value;
                 }
-                Vertical => {}
-                FourScreen => {
-                    todo!("FourScreen mirroring");
-                }
-            },
-            _ => {}
+            }
         }
+        self.vram_address =
+            self.vram_address
+                .wrapping_add(if self.vram_increment_32 { 32 } else { 1 });
+        self.vram_address &= 0x3FFF;
     }
 
     pub fn ppu_addr(&mut self, value: u8) {
