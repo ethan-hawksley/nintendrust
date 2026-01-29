@@ -16,6 +16,7 @@ pub struct Ppu {
     temporary_vram_address: u16,
     transfer_address: u16,
     vram_increment_32: bool,
+    read_buffer: u8,
 }
 
 impl Ppu {
@@ -39,6 +40,7 @@ impl Ppu {
             temporary_vram_address: 0,
             transfer_address: 0,
             vram_increment_32: false,
+            read_buffer: 0,
         }
     }
 
@@ -154,10 +156,31 @@ impl Ppu {
         }
     }
 
-    pub fn read_register(&self, address: u16) -> u8 {
+    pub fn peek_register(&self, address: u16) -> u8 {
         match address {
             0x2002 => 0x80, // PPU STATUS
-            0x2007 => 0,
+            0x2007 => self.read_buffer,
+            _ => 0,
+        }
+    }
+
+    pub fn read_register(&mut self, address: u16) -> u8 {
+        match address {
+            0x2002 => 0x80, // PPU STATUS
+            0x2007 => {
+                let previous_buffer = self.read_buffer;
+                match self.vram_address {
+                    ..0x2000 => {
+                        self.read_buffer = self.chr_memory[self.vram_address as usize];
+                    }
+                    _ => todo!("Finish read register"),
+                }
+                self.vram_address =
+                    self.vram_address
+                        .wrapping_add(if self.vram_increment_32 { 32 } else { 1 });
+                self.vram_address &= 0x3FFF;
+                previous_buffer
+            }
             _ => 0,
         }
     }
@@ -176,6 +199,7 @@ impl Ppu {
             }
             0x2007 => {
                 // PPUDATA
+                self.ppu_data(value);
             }
             _ => {
                 todo!("Unimplemented ppu register write 0x{:04X}", address);

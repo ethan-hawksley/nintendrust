@@ -18,7 +18,24 @@ impl Bus {
         }
     }
 
-    pub fn read(&self, addr: u16) -> u8 {
+    pub fn peek(&self, addr: u16) -> u8 {
+        match addr {
+            0x0000..=0x1FFF => self.ram[(addr & 0x07FF) as usize],
+            0x2000..=0x3FFF => self.ppu.peek_register(addr & 0x2007),
+            0x4000..=0x4017 => 0, // TODO: implement audio registers
+            0x8000.. => {
+                let rom_index = (addr - 0x8000) as usize;
+                if rom_index < self.rom.prg_rom.len() {
+                    self.rom.prg_rom[rom_index]
+                } else {
+                    panic!("Indexed ROM out of bounds {}", rom_index);
+                }
+            }
+            _ => todo!("Unimplemented memory access 0x{:04X}", addr),
+        }
+    }
+    
+    pub fn read(&mut self, addr: u16) -> u8 {
         match addr {
             0x0000..=0x1FFF => self.ram[(addr & 0x07FF) as usize],
             0x2000..=0x3FFF => self.ppu.read_register(addr & 0x2007),

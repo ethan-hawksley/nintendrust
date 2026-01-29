@@ -64,18 +64,18 @@ impl Cpu {
     }
 
     pub fn trace(&self, bus: &Bus) -> String {
-        let code = bus.read(self.program_counter);
+        let code = bus.peek(self.program_counter);
         let length = self.get_operand_mode(code);
 
         let mut hex_dump = vec![];
         hex_dump.push(code);
 
         if length > 1 {
-            let mem = bus.read(self.program_counter + 1);
+            let mem = bus.peek(self.program_counter + 1);
             hex_dump.push(mem);
         }
         if length > 2 {
-            let mem = bus.read(self.program_counter + 2);
+            let mem = bus.peek(self.program_counter + 2);
             hex_dump.push(mem);
         }
 
@@ -102,7 +102,7 @@ impl Cpu {
         )
     }
 
-    pub fn reset(&mut self, bus: &Bus) {
+    pub fn reset(&mut self, bus: &mut Bus) {
         let pc_low = bus.read(0xFFFC);
         let pc_high = bus.read(0xFFFD);
         self.program_counter = (pc_high as u16 * 0x100) + pc_low as u16;
@@ -115,7 +115,7 @@ impl Cpu {
         self.stack_pointer = self.stack_pointer.wrapping_sub(1);
     }
 
-    fn pull(&mut self, bus: &Bus) -> u8 {
+    fn pull(&mut self, bus: &mut Bus) -> u8 {
         self.stack_pointer = self.stack_pointer.wrapping_add(1);
         let value = bus.read(0x100 + self.stack_pointer as u16);
         value
@@ -141,13 +141,13 @@ impl Cpu {
         self.flag_negative = (data & 0x80) != 0;
     }
 
-    fn read_immediate_addressed(&mut self, bus: &Bus) -> u8 {
+    fn read_immediate_addressed(&mut self, bus: &mut Bus) -> u8 {
         let value = bus.read(self.program_counter);
         self.program_counter = self.program_counter.wrapping_add(1);
         value
     }
 
-    fn read_absolute_addressed(&mut self, bus: &Bus) -> u16 {
+    fn read_absolute_addressed(&mut self, bus: &mut Bus) -> u16 {
         let value_low = bus.read(self.program_counter);
         self.program_counter = self.program_counter.wrapping_add(1);
         let value_high = bus.read(self.program_counter);
@@ -155,7 +155,7 @@ impl Cpu {
         (value_high as u16) << 8 | value_low as u16
     }
 
-    fn read_absolute_addressed_x_indexed(&mut self, bus: &Bus) -> u16 {
+    fn read_absolute_addressed_x_indexed(&mut self, bus: &mut Bus) -> u16 {
         let value_low = bus.read(self.program_counter);
         self.program_counter = self.program_counter.wrapping_add(1);
         let value_high = bus.read(self.program_counter);
@@ -163,7 +163,7 @@ impl Cpu {
         ((value_high as u16) << 8 | value_low as u16).wrapping_add(self.x as u16)
     }
 
-    fn read_absolute_addressed_y_indexed(&mut self, bus: &Bus) -> u16 {
+    fn read_absolute_addressed_y_indexed(&mut self, bus: &mut Bus) -> u16 {
         let value_low = bus.read(self.program_counter);
         self.program_counter = self.program_counter.wrapping_add(1);
         let value_high = bus.read(self.program_counter);
@@ -171,19 +171,19 @@ impl Cpu {
         ((value_high as u16) << 8 | value_low as u16).wrapping_add(self.y as u16)
     }
 
-    fn read_zero_page_addressed_x_indexed(&mut self, bus: &Bus) -> u16 {
+    fn read_zero_page_addressed_x_indexed(&mut self, bus: &mut Bus) -> u16 {
         let address = bus.read(self.program_counter);
         self.program_counter = self.program_counter.wrapping_add(1);
         address.wrapping_add(self.x) as u16
     }
 
-    fn read_zero_page_addressed_y_indexed(&mut self, bus: &Bus) -> u16 {
+    fn read_zero_page_addressed_y_indexed(&mut self, bus: &mut Bus) -> u16 {
         let address = bus.read(self.program_counter);
         self.program_counter = self.program_counter.wrapping_add(1);
         address.wrapping_add(self.y) as u16
     }
 
-    fn read_indirect_addressed(&mut self, bus: &Bus) -> u16 {
+    fn read_indirect_addressed(&mut self, bus: &mut Bus) -> u16 {
         let address_low = bus.read(self.program_counter);
         self.program_counter = self.program_counter.wrapping_add(1);
         let address_high = bus.read(self.program_counter);
@@ -195,7 +195,7 @@ impl Cpu {
         (value_high as u16) << 8 | value_low as u16
     }
 
-    fn read_indirect_addressed_x_indexed(&mut self, bus: &Bus) -> u16 {
+    fn read_indirect_addressed_x_indexed(&mut self, bus: &mut Bus) -> u16 {
         let address = bus.read(self.program_counter).wrapping_add(self.x);
         self.program_counter = self.program_counter.wrapping_add(1);
         let value_low = bus.read(address as u16);
@@ -203,7 +203,7 @@ impl Cpu {
         (value_high as u16) << 8 | value_low as u16
     }
 
-    fn read_indirect_addressed_y_indexed(&mut self, bus: &Bus) -> u16 {
+    fn read_indirect_addressed_y_indexed(&mut self, bus: &mut Bus) -> u16 {
         let address = bus.read(self.program_counter);
         self.program_counter = self.program_counter.wrapping_add(1);
         let value_low = bus.read(address as u16);
@@ -271,21 +271,21 @@ impl Cpu {
         bus.write(address, value);
     }
 
-    fn bitwise_or(&mut self, bus: &Bus, address: u16) {
+    fn bitwise_or(&mut self, bus: &mut Bus, address: u16) {
         let value = bus.read(address);
         self.a |= value;
         self.flag_zero = self.a == 0;
         self.flag_negative = self.a & 0x80 != 0;
     }
 
-    fn bitwise_and(&mut self, bus: &Bus, address: u16) {
+    fn bitwise_and(&mut self, bus: &mut Bus, address: u16) {
         let value = bus.read(address);
         self.a &= value;
         self.flag_zero = self.a == 0;
         self.flag_negative = self.a & 0x80 != 0;
     }
 
-    fn bitwise_eor(&mut self, bus: &Bus, address: u16) {
+    fn bitwise_eor(&mut self, bus: &mut Bus, address: u16) {
         let value = bus.read(address);
         self.a ^= value;
         self.flag_zero = self.a == 0;
