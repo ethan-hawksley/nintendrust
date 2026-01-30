@@ -34,7 +34,7 @@ impl Bus {
             _ => todo!("Unimplemented memory access 0x{:04X}", addr),
         }
     }
-    
+
     pub fn read(&mut self, addr: u16) -> u8 {
         match addr {
             0x0000..=0x1FFF => self.ram[(addr & 0x07FF) as usize],

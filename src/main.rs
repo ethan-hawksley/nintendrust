@@ -34,5 +34,6 @@ fn main() {
     }
 
     let output_frame = bus.ppu.debug_draw_nametable();
-    image::save_buffer("nametable.png", &output_frame, 512, 240, Rgb8).expect("Failed to save image");
+    image::save_buffer("nametable.png", &output_frame, 512, 240, Rgb8)
+        .expect("Failed to save image");
 }

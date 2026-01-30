@@ -10,7 +10,6 @@ pub struct Ppu {
     vram: [u8; 2048],
     palette_ram: [u8; 32],
     oam: [u8; 256],
-    internal_data_buf: u8,
     write_latch: bool,
     vram_address: u16,
     temporary_vram_address: u16,
@@ -34,7 +33,6 @@ impl Ppu {
             vram: [0; 2048],
             palette_ram: [0; 32],
             oam: [0; 256],
-            internal_data_buf: 0,
             write_latch: false,
             vram_address: 0,
             temporary_vram_address: 0,
@@ -112,7 +110,7 @@ impl Ppu {
                     // TODO: Use PPUCTRL bit 4 to select pattern table
                     let chr_offset = tile_index * 16;
 
-                    for row in 0..8usize {
+                    for row in 0..8 {
                         if chr_offset + row + 8 >= self.chr_memory.len() {
                             continue;
                         }
@@ -120,7 +118,7 @@ impl Ppu {
                         let tile_lsb = self.chr_memory[chr_offset + row];
                         let tile_msb = self.chr_memory[chr_offset + row + 8];
 
-                        for col in 0..8usize {
+                        for col in 0..8 {
                             let mask = 1 << (7 - col);
                             let lsb = if tile_lsb & mask != 0 { 1 } else { 0 };
                             let msb = if tile_msb & mask != 0 { 2 } else { 0 };
@@ -168,16 +166,30 @@ impl Ppu {
         match address {
             0x2002 => 0x80, // PPU STATUS
             0x2007 => {
+                // PPU DATA
                 let previous_buffer = self.read_buffer;
+
                 match self.vram_address {
                     ..0x2000 => {
+                        // Read from pattern table
                         self.read_buffer = self.chr_memory[self.vram_address as usize];
                     }
                     0x2000..0x3F00 => {
+                        // Read from nametables
                         let mapped_vram_address = self.map_vram_address(self.vram_address);
+                        self.read_buffer = self.vram[mapped_vram_address as usize];
                     }
-                    _ => todo!("Finish read register"),
+                    0x3F00.. => {
+                        if (self.vram_address & 3) == 0 {
+                            self.read_buffer =
+                                self.palette_ram[(self.vram_address & 0x0F) as usize];
+                        } else {
+                            self.read_buffer =
+                                self.palette_ram[(self.vram_address & 0x1F) as usize];
+                        }
+                    }
                 }
+
                 self.vram_address =
                     self.vram_address
                         .wrapping_add(if self.vram_increment_32 { 32 } else { 1 });
@@ -197,11 +209,11 @@ impl Ppu {
             0x2004 => {}
             0x2005 => {}
             0x2006 => {
-                // PPUADDR
+                // PPU ADDR
                 self.ppu_addr(value);
             }
             0x2007 => {
-                // PPUDATA
+                // PPU DATA
                 self.ppu_data(value);
             }
             _ => {
