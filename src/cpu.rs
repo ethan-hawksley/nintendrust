@@ -350,11 +350,11 @@ impl Cpu {
         }
     }
 
-    pub fn emulate_cpu(&mut self, bus: &mut Bus) -> u8 {
+    pub fn emulate_cpu(&mut self, bus: &mut Bus) {
         let opcode = bus.read(self.program_counter);
         self.program_counter = self.program_counter.wrapping_add(1);
 
-        match opcode {
+        let cycles = match opcode {
             0x00 => {
                 // BRK
                 self.program_counter = self.program_counter.wrapping_add(1);
@@ -1366,6 +1366,12 @@ impl Cpu {
                 // Unknown opcode
                 panic!("Unknown opcode {:02X}", opcode)
             }
+        };
+        
+        for _ in 0..cycles {
+            bus.ppu.emulate_ppu();
+            bus.ppu.emulate_ppu();
+            bus.ppu.emulate_ppu();
         }
     }
 }

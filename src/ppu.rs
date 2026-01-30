@@ -167,7 +167,7 @@ impl Ppu {
             0x2002 => 0x80, // PPU STATUS
             0x2007 => {
                 // PPU DATA
-                let previous_buffer = self.read_buffer;
+                let mut previous_buffer = self.read_buffer;
 
                 match self.vram_address {
                     ..0x2000 => {
@@ -181,10 +181,10 @@ impl Ppu {
                     }
                     0x3F00.. => {
                         if (self.vram_address & 3) == 0 {
-                            self.read_buffer =
+                            previous_buffer =
                                 self.palette_ram[(self.vram_address & 0x0F) as usize];
                         } else {
-                            self.read_buffer =
+                            previous_buffer =
                                 self.palette_ram[(self.vram_address & 0x1F) as usize];
                         }
                     }
@@ -256,5 +256,9 @@ impl Ppu {
             self.transfer_address = self.vram_address;
         }
         self.write_latch = !self.write_latch;
+    }
+
+    pub fn emulate_ppu(&mut self) {
+
     }
 }
