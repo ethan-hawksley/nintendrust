@@ -106,7 +106,7 @@ impl Ppu {
                     // Get tile index from nametable in VRAM
                     let nametable_addr = nametable_base + (tile_y * 32 + tile_x) as u16;
                     let mapped_addr = self.map_vram_address(nametable_addr);
-                    let tile_index = self.vram[mapped_addr] as usize;
+                    let tile_index = self.vram[mapped_addr as usize] as usize;
 
                     // Get tile from pattern table 0
                     // TODO: Use PPUCTRL bit 4 to select pattern table
@@ -144,12 +144,12 @@ impl Ppu {
         frame_buffer
     }
 
-    fn map_vram_address(&self, addr: u16) -> usize {
+    fn map_vram_address(&self, addr: u16) -> u16 {
         let mirrored_addr = addr & 0x0FFF;
 
         match self.cartridge_info.mirroring {
-            Horizontal => ((mirrored_addr & 0x3FF) | ((mirrored_addr >> 1) & 0x400)) as usize,
-            Vertical => (mirrored_addr & 0x7FF) as usize,
+            Horizontal => (mirrored_addr & 0x3FF) | ((mirrored_addr >> 1) & 0x400),
+            Vertical => mirrored_addr & 0x7FF,
             FourScreen => {
                 todo!("FourScreen mirroring");
             }
@@ -172,6 +172,9 @@ impl Ppu {
                 match self.vram_address {
                     ..0x2000 => {
                         self.read_buffer = self.chr_memory[self.vram_address as usize];
+                    }
+                    0x2000..0x3F00 => {
+                        let mapped_vram_address = self.map_vram_address(self.vram_address);
                     }
                     _ => todo!("Finish read register"),
                 }
@@ -217,7 +220,7 @@ impl Ppu {
             }
             0x2000..0x3F00 => {
                 let mapped_vram_index = self.map_vram_address(self.vram_address);
-                self.vram[mapped_vram_index] = value;
+                self.vram[mapped_vram_index as usize] = value;
             }
             _ => {
                 if (self.vram_address & 0x03) == 0 {
