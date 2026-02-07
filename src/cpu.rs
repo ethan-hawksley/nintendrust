@@ -14,6 +14,7 @@ pub struct Cpu {
     flag_overflow: bool,
     flag_negative: bool,
     pub halted: bool,
+    nmi_level_detector: bool,
 }
 
 impl Cpu {
@@ -31,6 +32,7 @@ impl Cpu {
             flag_zero: false,
             flag_decimal: false,
             flag_interrupt_disable: false,
+            nmi_level_detector: false,
         }
     }
 
@@ -351,13 +353,28 @@ impl Cpu {
     }
 
     pub fn emulate_cpu(&mut self, bus: &mut Bus) {
-        let opcode = bus.read(self.program_counter);
-        self.program_counter = self.program_counter.wrapping_add(1);
+        let previous_nmi_level_detector = self.nmi_level_detector;
+        self.nmi_level_detector = bus.ppu.enable_nmi && bus.ppu.v_blank;
+        let do_nmi = if !previous_nmi_level_detector && self.nmi_level_detector {
+            true
+        } else {
+            false
+        };
+
+        let opcode = if do_nmi {
+            0x00
+        } else {
+            let value = bus.read(self.program_counter);
+            self.program_counter = self.program_counter.wrapping_add(1);
+            value
+        };
 
         let cycles = match opcode {
             0x00 => {
                 // BRK
-                self.program_counter = self.program_counter.wrapping_add(1);
+                if !do_nmi {
+                    self.program_counter = self.program_counter.wrapping_add(1);
+                }
                 self.push(bus, (self.program_counter >> 8) as u8);
                 self.push(bus, self.program_counter as u8);
 
@@ -366,8 +383,8 @@ impl Cpu {
 
                 self.flag_interrupt_disable = true;
 
-                let destination_address_low = bus.read(0xFFFE);
-                let destination_address_high = bus.read(0xFFFF);
+                let destination_address_low = bus.read(if do_nmi { 0xFFFA } else { 0xFFFE });
+                let destination_address_high = bus.read(if do_nmi { 0xFFFB } else { 0xFFFF });
                 self.program_counter =
                     (destination_address_high as u16) << 8 | destination_address_low as u16;
                 7

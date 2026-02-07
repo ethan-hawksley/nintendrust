@@ -23,15 +23,15 @@ fn main() {
 
     cpu.reset(&mut bus);
 
-    // for _ in 0..1000000 {
+    for _ in 0..1000000 {
+        // println!("{}", cpu.trace(&bus));
+        cpu.emulate_cpu(&mut bus);
+    }
+
+    // while !cpu.halted {
     //     println!("{}", cpu.trace(&bus));
     //     cpu.emulate_cpu(&mut bus);
     // }
-
-    while !cpu.halted {
-        println!("{}", cpu.trace(&bus));
-        cpu.emulate_cpu(&mut bus);
-    }
 
     let output_frame = bus.ppu.debug_draw_nametable();
     image::save_buffer("nametable.png", &output_frame, 512, 240, Rgb8)
