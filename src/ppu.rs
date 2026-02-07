@@ -30,7 +30,6 @@ pub struct Ppu {
     enable_nmi: bool,
 }
 
-
 impl Ppu {
     pub fn new(cartridge_info: CartridgeInfo, chr_rom: Vec<u8>) -> Self {
         let (chr_memory, chr_is_ram) = if chr_rom.is_empty() {
@@ -190,11 +189,12 @@ impl Ppu {
     pub fn read_register(&mut self, address: u16) -> u8 {
         match address {
             0x2002 => {
+                // PPU STATUS
                 let status = (self.v_blank as u8) << 7;
                 self.v_blank = false;
                 self.write_latch = false;
                 status
-            } // PPU STATUS
+            }
             0x2007 => {
                 // PPU DATA
                 let mut previous_buffer = self.read_buffer;
@@ -231,9 +231,16 @@ impl Ppu {
     pub fn write_register(&mut self, address: u16, value: u8) {
         match address {
             0x2000 => {
-                self.nametable_select = value & 0x03;
+                // PPU CTRL
+                self.nametable_select = value & 3;
+                self.vram_increment_32 = value & 4 != 0;
+                self.sprite_pattern_table = value & 8 != 0;
+                self.bg_pattern_table = value & 0x10 != 0;
+                self.use_8x16_sprites = value & 0x20 != 0;
+                self.enable_nmi = value & 0x80 != 0;
             }
             0x2001 => {
+                // PPU MASK
                 self.mask_background_8px = (value & 2) != 0;
                 self.mask_sprites_8px = (value & 4) != 0;
                 self.mask_render_background = (value & 8) != 0;
