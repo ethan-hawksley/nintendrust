@@ -16,7 +16,20 @@ pub struct Ppu {
     transfer_address: u16,
     vram_increment_32: bool,
     read_buffer: u8,
+    ppu_dot: u16,
+    ppu_scanline: u16,
+    v_blank: bool,
+    mask_background_8px: bool,
+    mask_sprites_8px: bool,
+    mask_render_background: bool,
+    mask_render_sprites: bool,
+    nametable_select: u8,
+    sprite_pattern_table: bool,
+    bg_pattern_table: bool,
+    use_8x16_sprites: bool,
+    enable_nmi: bool,
 }
+
 
 impl Ppu {
     pub fn new(cartridge_info: CartridgeInfo, chr_rom: Vec<u8>) -> Self {
@@ -39,6 +52,18 @@ impl Ppu {
             transfer_address: 0,
             vram_increment_32: false,
             read_buffer: 0,
+            ppu_dot: 0,
+            ppu_scanline: 0,
+            v_blank: false,
+            mask_background_8px: false,
+            mask_sprites_8px: false,
+            mask_render_background: false,
+            mask_render_sprites: false,
+            nametable_select: 0,
+            sprite_pattern_table: false,
+            bg_pattern_table: false,
+            use_8x16_sprites: false,
+            enable_nmi: false,
         }
     }
 
@@ -156,7 +181,7 @@ impl Ppu {
 
     pub fn peek_register(&self, address: u16) -> u8 {
         match address {
-            0x2002 => 0x80, // PPU STATUS
+            0x2002 => (self.v_blank as u8) << 7, // PPU STATUS
             0x2007 => self.read_buffer,
             _ => 0,
         }
@@ -164,7 +189,12 @@ impl Ppu {
 
     pub fn read_register(&mut self, address: u16) -> u8 {
         match address {
-            0x2002 => 0x80, // PPU STATUS
+            0x2002 => {
+                let status = (self.v_blank as u8) << 7;
+                self.v_blank = false;
+                self.write_latch = false;
+                status
+            } // PPU STATUS
             0x2007 => {
                 // PPU DATA
                 let mut previous_buffer = self.read_buffer;
@@ -181,11 +211,9 @@ impl Ppu {
                     }
                     0x3F00.. => {
                         if (self.vram_address & 3) == 0 {
-                            previous_buffer =
-                                self.palette_ram[(self.vram_address & 0x0F) as usize];
+                            previous_buffer = self.palette_ram[(self.vram_address & 0x0F) as usize];
                         } else {
-                            previous_buffer =
-                                self.palette_ram[(self.vram_address & 0x1F) as usize];
+                            previous_buffer = self.palette_ram[(self.vram_address & 0x1F) as usize];
                         }
                     }
                 }
@@ -202,8 +230,15 @@ impl Ppu {
 
     pub fn write_register(&mut self, address: u16, value: u8) {
         match address {
-            0x2000 => {}
-            0x2001 => {}
+            0x2000 => {
+                self.nametable_select = value & 0x03;
+            }
+            0x2001 => {
+                self.mask_background_8px = (value & 2) != 0;
+                self.mask_sprites_8px = (value & 4) != 0;
+                self.mask_render_background = (value & 8) != 0;
+                self.mask_render_sprites = (value & 0x10) != 0;
+            }
             0x2002 => {}
             0x2003 => {}
             0x2004 => {}
@@ -259,6 +294,20 @@ impl Ppu {
     }
 
     pub fn emulate_ppu(&mut self) {
+        self.ppu_dot += 1;
 
+        if self.ppu_dot >= 341 {
+            self.ppu_dot = 0;
+            self.ppu_scanline += 1;
+            if self.ppu_scanline >= 262 {
+                self.ppu_scanline = 0;
+            }
+        }
+
+        if self.ppu_dot == 1 && self.ppu_scanline == 241 {
+            self.v_blank = true;
+        } else if self.ppu_dot == 1 && self.ppu_scanline == 261 {
+            self.v_blank = false;
+        }
     }
 }

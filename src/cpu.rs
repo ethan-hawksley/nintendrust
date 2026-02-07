@@ -1367,7 +1367,7 @@ impl Cpu {
                 panic!("Unknown opcode {:02X}", opcode)
             }
         };
-        
+
         for _ in 0..cycles {
             bus.ppu.emulate_ppu();
             bus.ppu.emulate_ppu();
