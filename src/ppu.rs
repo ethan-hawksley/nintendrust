@@ -119,6 +119,8 @@ impl Ppu {
 
         let palette = [(0, 0, 0), (85, 85, 85), (170, 170, 170), (255, 255, 255)];
 
+        let pattern_table_base = if self.bg_pattern_table { 4096 } else { 0 };
+
         for nametable in 0..2u16 {
             let nametable_base = 0x2000 + nametable * 0x400;
             let screen_offset_x = nametable as usize * 256;
@@ -139,8 +141,8 @@ impl Ppu {
                             continue;
                         }
 
-                        let tile_lsb = self.chr_memory[chr_offset + row];
-                        let tile_msb = self.chr_memory[chr_offset + row + 8];
+                        let tile_lsb = self.chr_memory[chr_offset + row + pattern_table_base];
+                        let tile_msb = self.chr_memory[chr_offset + row + 8 + pattern_table_base];
 
                         for col in 0..8 {
                             let mask = 1 << (7 - col);
