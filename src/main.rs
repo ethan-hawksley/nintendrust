@@ -3,6 +3,7 @@ use nintendrust::bus::Bus;
 use nintendrust::cpu::Cpu;
 use nintendrust::rom::Rom;
 use std::fs;
+use minifb::{Scale, Window, WindowOptions};
 
 fn main() {
     let file_path = "Super Mario Bros.nes";
@@ -23,17 +24,36 @@ fn main() {
 
     cpu.reset(&mut bus);
 
-    for _ in 0..1000000 {
-        // println!("{}", cpu.trace(&bus));
-        cpu.emulate_cpu(&mut bus);
+    let mut window = Window::new(
+        "Nintendrust",
+        256,
+        240,
+        WindowOptions {
+            scale: Scale::X2,
+            ..WindowOptions::default()
+        },
+    ).unwrap();
+
+    window.set_target_fps(60);
+
+    while window.is_open() {
+        bus.ppu.frame_complete = false;
+        while !bus.ppu.frame_complete && !cpu.halted {
+            cpu.emulate_cpu(&mut bus);
+        }
+        window.update_with_buffer(&bus.ppu.frame_buffer, 256, 240).unwrap();
     }
 
-    // while !cpu.halted {
-    //     println!("{}", cpu.trace(&bus));
+    // for _ in 0..1000000 {
+    //     // println!("{}", cpu.trace(&bus));
     //     cpu.emulate_cpu(&mut bus);
     // }
 
-    let output_frame = bus.ppu.debug_draw_nametable();
-    image::save_buffer("nametable.png", &output_frame, 512, 240, Rgb8)
-        .expect("Failed to save image");
+    // while !cpu.halted {
+    //     cpu.emulate_cpu(&mut bus);
+    // }
+
+    // let output_frame = bus.ppu.debug_draw_nametable();
+    // image::save_buffer("nametable.png", &output_frame, 512, 240, Rgb8)
+    //     .expect("Failed to save image");
 }

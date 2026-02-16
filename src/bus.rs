@@ -59,7 +59,12 @@ impl Bus {
                 let ppu_address = address & 0x2007;
                 self.ppu.write_register(ppu_address, value);
             }
-            0x4000..=0x4017 => {} // TODO: implement audio registers
+            0x4000..=0x4017 => {
+                // OAM DMA
+                for i in 0..256 {
+                    self.ppu.oam[i] = self.read(((value as u16) << 8) + i as u16)
+                }
+            } // TODO: implement audio registers
             _ => todo!("Unimplemented memory access 0x{:04X}", address),
         }
     }
