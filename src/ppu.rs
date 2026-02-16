@@ -45,7 +45,7 @@ pub struct Ppu {
     sprite_evaluation_temp: u8,
     secondary_oam_address: u8,
     secondary_oam_full: bool,
-    oam_address: u16,
+    oam_address: u8,
     sprite_evaluation_tick: u8,
     status_overflow: bool,
     status_sprite_zero_hit: bool,
@@ -327,7 +327,11 @@ impl Ppu {
 
     pub fn peek_register(&self, address: u16) -> u8 {
         match address {
-            0x2002 => (self.v_blank as u8) << 7, // PPU STATUS
+            0x2002 => {
+                0 | (self.v_blank as u8) << 7
+                    | (self.status_sprite_zero_hit as u8) << 6
+                    | (self.status_overflow as u8) << 1
+            }
             0x2007 => self.read_buffer,
             _ => 0,
         }
@@ -358,7 +362,11 @@ impl Ppu {
         match address {
             0x2002 => {
                 // PPU STATUS
-                let status = (self.v_blank as u8) << 7 | 1 << 6;
+                let status = 0
+                    | (self.v_blank as u8) << 7
+                    | (self.status_sprite_zero_hit as u8) << 6
+                    | (self.status_overflow as u8) << 1;
+
                 self.v_blank = false;
                 self.write_latch = false;
                 status
@@ -512,10 +520,10 @@ impl Ppu {
                     + (self.scanline - (self.sprite_y_position[sprite_index] as u16))
             } else {
                 // Attributes are set to flip Y.
-                (if self.sprite_pattern_table { 0x1000 } else { 0 })
-                    + ((self.sprite_pattern[sprite_index] as u16) << 4)
-                    + (self.scanline
-                        - ((7 - (self.scanline - self.sprite_y_position[sprite_index] as u16)) & 7))
+                (if self.sprite_pattern_table { 0x1000u16 } else { 0u16 })
+                    .wrapping_add((self.sprite_pattern[sprite_index] as u16) << 4)
+                    .wrapping_add(self.scanline
+                        .wrapping_sub((7u16.wrapping_sub(self.scanline.wrapping_sub(self.sprite_y_position[sprite_index] as u16))) & 7))
             }
         } else {
             // 8x16 sprites.
@@ -553,6 +561,7 @@ impl Ppu {
         if self.ppu_dot == 0 {
             self.secondary_oam_address = 0;
             self.secondary_oam_full = false;
+            self.sprite_evaluation_oam_overflowed = false;
         } else if self.ppu_dot > 0 && self.ppu_dot <= 64 {
             if (self.ppu_dot & 1) == 1 {
                 // Odd PPU cycles load the value $FF
@@ -599,7 +608,7 @@ impl Ppu {
                         }
                         self.sprite_evaluation_tick += 1;
                     } else {
-                        self.oam_address += 4;
+                        self.oam_address = self.oam_address.wrapping_add(4);
                     }
                 } else {
                     // Reading index 1, 2, or 3 of an object's OAM data.
@@ -627,6 +636,7 @@ impl Ppu {
                 self.secondary_oam_size = self.secondary_oam_address;
                 self.secondary_oam_address = 0;
                 self.sprite_evaluation_tick = 0;
+                self.scanline_contains_sprite_zero = false;
             }
             match self.sprite_evaluation_tick {
                 0 => {
@@ -689,6 +699,7 @@ impl Ppu {
                     self.sprite_shift_register_h[(self.secondary_oam_address / 4) as usize] =
                         self.sprite_evaluation_temp;
                     self.oam_address += 1;
+                    self.secondary_oam_address += 1;
                 }
                 _ => unreachable!(),
             }
@@ -699,18 +710,45 @@ impl Ppu {
     }
 
     pub fn emulate_ppu(&mut self) {
+        // Signal a frame is done at the start of VBlank
+        if self.ppu_dot == 1 && self.scanline == 241 {
+            self.v_blank = true;
+            self.frame_complete = true;
+        } else if self.ppu_dot == 1 && self.scanline == 261 {
+            self.v_blank = false;
+            self.status_overflow = false;
+            self.status_sprite_zero_hit = false;
+        }
+
         let rendering_enabled = self.mask_render_background || self.mask_render_sprites;
         let visible_or_prerender = self.scanline < 240 || self.scanline == 261;
         let fetching_dot = (self.ppu_dot > 0 && self.ppu_dot <= 256)
             || (self.ppu_dot > 320 && self.ppu_dot <= 336);
 
         if visible_or_prerender && rendering_enabled {
+            self.sprite_evaluation();
+
             if fetching_dot {
                 if self.mask_render_background {
                     self.shift_register_pattern_l <<= 1;
                     self.shift_register_pattern_h <<= 1;
                     self.shift_register_attribute_l <<= 1;
                     self.shift_register_attribute_h <<= 1;
+                }
+
+                if self.mask_render_sprites
+                    && self.scanline < 240
+                    && self.ppu_dot >= 1
+                    && self.ppu_dot <= 256
+                {
+                    for i in 0..8 {
+                        if self.sprite_x_position[i] > 0 {
+                            self.sprite_x_position[i] -= 1;
+                        } else {
+                            self.sprite_shift_register_l[i] <<= 1;
+                            self.sprite_shift_register_h[i] <<= 1;
+                        }
+                    }
                 }
 
                 let cycle_tick: u8 = (self.ppu_dot.wrapping_sub(1) & 7) as u8;
@@ -818,26 +856,65 @@ impl Ppu {
                 palette_high = (pal_1 << 1) | pal_0;
 
                 // Map PPU pixels to Palette RAM indicies
-                let palette_ram_addr = if palette_low == 0 {
-                    0
-                } else {
-                    (palette_high << 2) | palette_low
-                } as usize;
-
-                // Look up NES colour index from PPU Palette RAM
-                let nes_colour_index = (self.palette_ram[palette_ram_addr] & 0x3f) as usize;
-
-                // Look up the 0xRRGGBB value
-                self.frame_buffer[y * 256 + x] = NES_PALETTE[nes_colour_index];
+                if palette_low == 0 {
+                    palette_high = 0;
+                }
             }
-        }
+            // Which colour palette to use.
+            let mut sprite_palette_high = 0;
+            // Index into colour palette
+            let mut sprite_palette_low = 0;
+            let mut sprite_priority = false;
 
-        // Signal a frame is done at the start of VBlank
-        if self.ppu_dot == 1 && self.scanline == 241 {
-            self.v_blank = true;
-            self.frame_complete = true;
-        } else if self.ppu_dot == 1 && self.scanline == 261 {
-            self.v_blank = false;
+            if self.mask_render_sprites && (self.ppu_dot > 8 || self.mask_sprites_8px) {
+                for i in 0..8 {
+                    if self.sprite_x_position[i] == 0 && i < (self.secondary_oam_size / 4) as usize
+                    {
+                        // Take bit for pattern low bit plane.
+                        let sprite_pixel_l = ((self.sprite_shift_register_l[i]) & 0x80) != 0;
+                        // Take bit for pattern high bit plane.
+                        let sprite_pixel_h = ((self.sprite_shift_register_h[i]) & 0x80) != 0;
+                        sprite_palette_low = 0
+                            | if sprite_pixel_l { 1 } else { 0 }
+                            | if sprite_pixel_h { 2 } else { 0 };
+
+                        // Read palette from secondary OAM attributes.
+                        sprite_palette_high = (self.sprite_attribute[i] & 0x03) | 0x04;
+                        // Read priority from secondary OAM attributes.
+                        sprite_priority = ((self.sprite_attribute[i] >> 5) & 1) == 0;
+                    } else {
+                        continue;
+                    }
+                    if sprite_palette_low != 0 {
+                        if i == 0
+                            && self.scanline_contains_sprite_zero
+                            && sprite_palette_low != 0
+                            && palette_low != 0
+                            && self.mask_render_background
+                            && self.ppu_dot < 256
+                        {
+                            self.status_sprite_zero_hit = true;
+                        }
+                        break;
+                    }
+                }
+            }
+
+            if (sprite_priority && palette_low != 0) || palette_low == 0 {
+                palette_low = sprite_palette_low;
+                palette_high = sprite_palette_high;
+                if palette_low == 0 {
+                    palette_high = 0;
+                }
+            }
+
+            let palette_ram_addr = ((palette_high << 2) | palette_low) as usize;
+
+            // Look up NES colour index from PPU Palette RAM
+            let nes_colour_index = (self.palette_ram[palette_ram_addr] & 0x3f) as usize;
+
+            // Look up the 0xRRGGBB value
+            self.frame_buffer[y * 256 + x] = NES_PALETTE[nes_colour_index];
         }
 
         self.ppu_dot += 1;
