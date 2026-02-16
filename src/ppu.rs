@@ -670,12 +670,14 @@ impl Ppu {
                 }
                 3 => {
                     // Set this object's X position in the array.
-                    self.sprite_attribute[(self.secondary_oam_address / 4) as usize] =
+                    self.sprite_x_position[(self.secondary_oam_address / 4) as usize] =
                         self.secondary_oam[self.secondary_oam_address as usize];
                 }
                 4 => {}
                 5 => {}
-                6 => {}
+                6 => {
+                    self.address_bus += 8;
+                }
                 7 => {}
                 _ => unreachable!(),
             }
