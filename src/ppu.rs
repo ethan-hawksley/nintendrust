@@ -12,7 +12,6 @@ pub struct Ppu {
     oam: [u8; 256],
     write_latch: bool,
     vram_address: u16,
-    temporary_vram_address: u16,
     transfer_address: u16,
     vram_increment_32: bool,
     read_buffer: u8,
@@ -57,7 +56,6 @@ impl Ppu {
             oam: [0; 256],
             write_latch: false,
             vram_address: 0,
-            temporary_vram_address: 0,
             transfer_address: 0,
             vram_increment_32: false,
             read_buffer: 0,
@@ -354,6 +352,8 @@ impl Ppu {
                 self.bg_pattern_table = value & 0x10 != 0;
                 self.use_8x16_sprites = value & 0x20 != 0;
                 self.enable_nmi = value & 0x80 != 0;
+
+                self.transfer_address = (self.transfer_address & 0xf3ff) | ((value as u16 & 0x03) << 10);
             }
             0x2001 => {
                 // PPU MASK
@@ -408,9 +408,9 @@ impl Ppu {
 
     pub fn ppu_addr(&mut self, value: u8) {
         if !self.write_latch {
-            self.temporary_vram_address = ((value & 0x3F) as u16) << 8;
+            self.transfer_address = ((value & 0x3F) as u16) << 8;
         } else {
-            self.vram_address = self.temporary_vram_address | value as u16;
+            self.vram_address = self.transfer_address | value as u16;
             self.transfer_address = self.vram_address;
         }
         self.write_latch = !self.write_latch;
@@ -514,7 +514,7 @@ impl Ppu {
                         self.cycle_attribute &= 3;
                     }
                     4 => {
-                        self.address_bus = ((self.vram_address & 0b01110000000000000) >> 12)
+                        self.address_bus = ((self.vram_address & 0b0111000000000000) >> 12)
                             | self.cycle_next_character as u16 * 16
                             | (if self.bg_pattern_table { 0x1000 } else { 0 });
                         self.cycle_temp = self.read_ppu(self.address_bus);
