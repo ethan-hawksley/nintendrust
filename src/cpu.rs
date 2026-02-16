@@ -378,7 +378,7 @@ impl Cpu {
                 self.push(bus, (self.program_counter >> 8) as u8);
                 self.push(bus, self.program_counter as u8);
 
-                let status = self.get_status_register(true);
+                let status = self.get_status_register(!do_nmi);
                 self.push(bus, status);
 
                 self.flag_interrupt_disable = true;
