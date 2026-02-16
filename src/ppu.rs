@@ -415,8 +415,15 @@ impl Ppu {
                 self.mask_render_sprites = (value & 0x10) != 0;
             }
             0x2002 => {}
-            0x2003 => {}
-            0x2004 => {}
+            0x2003 => {
+                // OAM ADDR
+                self.oam_address = value;
+            }
+            0x2004 => {
+                // OAM DATA
+                self.oam[self.oam_address as usize] = value;
+                self.oam_address = self.oam_address.wrapping_add(1);
+            }
             0x2005 => {
                 // PPU Scroll
                 if !self.write_latch {
@@ -458,9 +465,11 @@ impl Ppu {
             }
             _ => {
                 if (self.vram_address & 0x03) == 0 {
-                    self.palette_ram[(self.vram_address & 0x0F) as usize] = value;
+                    let idx = (self.vram_address & 0x0F) as usize;
+                    self.palette_ram[idx] = value;
                 } else {
-                    self.palette_ram[(self.vram_address & 0x1F) as usize] = value;
+                    let idx = (self.vram_address & 0x1F) as usize;
+                    self.palette_ram[idx] = value;
                 }
             }
         }
@@ -616,7 +625,7 @@ impl Ppu {
                     // Increment for next write to secondary OAM
                     self.secondary_oam_address += 1;
                     // Increment for next read from OAM
-                    self.oam_address += 1;
+                    self.oam_address = self.oam_address.wrapping_add(1);
 
                     if self.secondary_oam_address == 0x20 {
                         self.secondary_oam_full = true;
@@ -700,7 +709,6 @@ impl Ppu {
                     }
                     self.sprite_shift_register_h[(self.secondary_oam_address / 4) as usize] =
                         self.sprite_evaluation_temp;
-                    self.oam_address += 1;
                     self.secondary_oam_address += 1;
                 }
                 _ => unreachable!(),
@@ -863,28 +871,30 @@ impl Ppu {
                         let sprite_pixel_l = ((self.sprite_shift_register_l[i]) & 0x80) != 0;
                         // Take bit for pattern high bit plane.
                         let sprite_pixel_h = ((self.sprite_shift_register_h[i]) & 0x80) != 0;
-                        sprite_palette_low = 0
+                        let pixel_value = 0
                             | if sprite_pixel_l { 1 } else { 0 }
                             | if sprite_pixel_h { 2 } else { 0 };
 
-                        // Read palette from secondary OAM attributes.
-                        sprite_palette_high = (self.sprite_attribute[i] & 0x03) | 0x04;
-                        // Read priority from secondary OAM attributes.
-                        sprite_priority = ((self.sprite_attribute[i] >> 5) & 1) == 0;
+                        // Only use this sprite's data if the pixel is opaque
+                        if pixel_value != 0 {
+                            sprite_palette_low = pixel_value;
+                            // Read palette from secondary OAM attributes.
+                            sprite_palette_high = (self.sprite_attribute[i] & 0x03) | 0x04;
+                            // Read priority from secondary OAM attributes.
+                            sprite_priority = ((self.sprite_attribute[i] >> 5) & 1) == 0;
+
+                            if i == 0
+                                && self.scanline_contains_sprite_zero
+                                && palette_low != 0
+                                && self.mask_render_background
+                                && self.ppu_dot < 256
+                            {
+                                self.status_sprite_zero_hit = true;
+                            }
+                            break;
+                        }
                     } else {
                         continue;
-                    }
-                    if sprite_palette_low != 0 {
-                        if i == 0
-                            && self.scanline_contains_sprite_zero
-                            && sprite_palette_low != 0
-                            && palette_low != 0
-                            && self.mask_render_background
-                            && self.ppu_dot < 256
-                        {
-                            self.status_sprite_zero_hit = true;
-                        }
-                        break;
                     }
                 }
             }
