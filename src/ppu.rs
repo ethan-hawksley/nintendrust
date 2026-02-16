@@ -28,6 +28,13 @@ pub struct Ppu {
     bg_pattern_table: bool,
     use_8x16_sprites: bool,
     pub enable_nmi: bool,
+    shift_register_pattern_l: u16,
+    shift_register_pattern_h: u16,
+    shift_register_attribute_l: u16,
+    shift_register_attribute_h: u16,
+    cycle_attribute: u8,
+    pattern_low_bit_plane: u8,
+    pattern_high_bit_plane: u8,
 }
 
 impl Ppu {
@@ -63,6 +70,13 @@ impl Ppu {
             bg_pattern_table: false,
             use_8x16_sprites: false,
             enable_nmi: false,
+            shift_register_pattern_l: 0,
+            shift_register_pattern_h: 0,
+            shift_register_attribute_l: 0,
+            shift_register_attribute_h: 0,
+            cycle_attribute: 0,
+            pattern_low_bit_plane: 0,
+            pattern_high_bit_plane: 0,
         }
     }
 
@@ -117,7 +131,7 @@ impl Ppu {
         let height = 240;
         let mut frame_buffer = vec![0; width * height * 3];
 
-        let pal = [
+        let palette = [
             // Row 0
             (0x65, 0x65, 0x65),
             (0x00, 0x2A, 0x84),
@@ -192,6 +206,7 @@ impl Ppu {
 
         for nametable in 0..2u16 {
             let nametable_base = 0x2000 + nametable * 0x400;
+            let attribute_base = nametable_base + 0x3C0;
             let screen_offset_x = nametable as usize * 256;
 
             for tile_y in 0..30usize {
@@ -201,8 +216,15 @@ impl Ppu {
                     let mapped_addr = self.map_vram_address(nametable_addr);
                     let tile_index = self.vram[mapped_addr as usize] as usize;
 
+                    let attr_offset = (tile_y / 4) * 8 + (tile_x / 4);
+                    let attr_addr = attribute_base + attr_offset as u16;
+                    let mapped_attr_addr = self.map_vram_address(attr_addr);
+                    let attr_byte = self.vram[mapped_attr_addr as usize];
+
+                    let shift = ((tile_y & 2) << 1) | (tile_x & 2);
+                    let palette_idx = (attr_byte >> shift) & 0x3;
+
                     // Get tile from pattern table 0
-                    // TODO: Use PPUCTRL bit 4 to select pattern table
                     let chr_offset = tile_index * 16;
 
                     for row in 0..8 {
@@ -217,9 +239,17 @@ impl Ppu {
                             let mask = 1 << (7 - col);
                             let lsb = if tile_lsb & mask != 0 { 1 } else { 0 };
                             let msb = if tile_msb & mask != 0 { 2 } else { 0 };
-                            let val = msb | lsb;
+                            let pixel_val = msb | lsb;
 
-                            let (r, g, b) = pal[self.palette_ram[val] as usize];
+                            let color_index_in_palette_ram = if pixel_val == 0 {
+                                0
+                            } else {
+                                (palette_idx as usize * 4) + pixel_val
+                            };
+
+                            let color_index = self.palette_ram[color_index_in_palette_ram] as usize;
+
+                            let (r, g, b) = palette[color_index];
 
                             let pixel_x = screen_offset_x + tile_x * 8 + col;
                             let pixel_y = tile_y * 8 + row;
@@ -257,6 +287,27 @@ impl Ppu {
         }
     }
 
+    fn read_ppu(&self, address: u16) -> u8 {
+        match address {
+            ..0x2000 => {
+                // Read from pattern table
+                self.chr_memory[self.vram_address as usize]
+            }
+            0x2000..0x3F00 => {
+                // Read from nametables
+                let mapped_vram_address = self.map_vram_address(self.vram_address);
+                self.vram[mapped_vram_address as usize]
+            }
+            0x3F00.. => {
+                if (self.vram_address & 3) == 0 {
+                    self.palette_ram[(self.vram_address & 0x0F) as usize]
+                } else {
+                    self.palette_ram[(self.vram_address & 0x1F) as usize]
+                }
+            }
+        }
+    }
+
     pub fn read_register(&mut self, address: u16) -> u8 {
         match address {
             0x2002 => {
@@ -270,23 +321,10 @@ impl Ppu {
                 // PPU DATA
                 let mut previous_buffer = self.read_buffer;
 
-                match self.vram_address {
-                    ..0x2000 => {
-                        // Read from pattern table
-                        self.read_buffer = self.chr_memory[self.vram_address as usize];
-                    }
-                    0x2000..0x3F00 => {
-                        // Read from nametables
-                        let mapped_vram_address = self.map_vram_address(self.vram_address);
-                        self.read_buffer = self.vram[mapped_vram_address as usize];
-                    }
-                    0x3F00.. => {
-                        if (self.vram_address & 3) == 0 {
-                            previous_buffer = self.palette_ram[(self.vram_address & 0x0F) as usize];
-                        } else {
-                            previous_buffer = self.palette_ram[(self.vram_address & 0x1F) as usize];
-                        }
-                    }
+                if self.vram_address >= 0x3f00 {
+                    previous_buffer = self.read_ppu(address);
+                } else {
+                    self.read_buffer = self.read_ppu(address);
                 }
 
                 self.vram_address =
@@ -372,6 +410,32 @@ impl Ppu {
     }
 
     pub fn emulate_ppu(&mut self) {
+        if self.ppu_dot == 1 && self.ppu_scanline == 241 {
+            self.v_blank = true;
+        } else if self.ppu_dot == 1 && self.ppu_scanline == 261 {
+            self.v_blank = false;
+        }
+
+        if self.ppu_scanline < 240 || self.ppu_scanline == 261 {
+            // If this is a visible scanline, or the pre-render line.
+            if (self.ppu_dot > 0 && self.ppu_dot <= 256)
+                || (self.ppu_dot > 320 && self.ppu_dot <= 336)
+            {
+                // If this is a visible pixel, or preparing the start of the next scanline.
+                if self.mask_render_background || self.mask_render_sprites {
+                    // If rendering is enabled.
+                    if self.mask_render_background {
+                        // If rendering the background, update the shift registers for the background.
+                        // Shift registers one bit to the left.
+                        self.shift_register_pattern_l <<= 1;
+                        self.shift_register_pattern_h <<= 1;
+                        self.shift_register_attribute_l <<= 1;
+                        self.shift_register_attribute_h <<= 1;
+                    }
+                }
+            }
+        }
+
         self.ppu_dot += 1;
 
         if self.ppu_dot >= 341 {
@@ -382,10 +446,34 @@ impl Ppu {
             }
         }
 
-        if self.ppu_dot == 1 && self.ppu_scanline == 241 {
-            self.v_blank = true;
-        } else if self.ppu_dot == 1 && self.ppu_scanline == 261 {
-            self.v_blank = false;
-        }
+        let cycle_tick: u8 = ((self.ppu_dot - 1) & 7) as u8;
+        match cycle_tick {
+            0 => {
+                self.shift_register_pattern_l =
+                    (self.shift_register_pattern_l & 0xff00) | self.pattern_low_bit_plane as u16;
+                self.shift_register_pattern_h =
+                    (self.shift_register_pattern_h & 0xff00) | self.pattern_high_bit_plane as u16;
+                self.shift_register_attribute_l = (self.shift_register_attribute_l & 0xff00)
+                    | if (self.cycle_attribute & 1) == 1 {
+                        0xff
+                    } else {
+                        0
+                    };
+                self.shift_register_attribute_h = (self.shift_register_attribute_h & 0xff00)
+                    | if (self.cycle_attribute & 2) == 2 {
+                        0xff
+                    } else {
+                        0
+                    };
+            }
+            1 => {}
+            2 => {}
+            3 => {}
+            4 => {}
+            5 => {}
+            6 => {}
+            7 => {}
+            _ => unreachable!(),
+        };
     }
 }
