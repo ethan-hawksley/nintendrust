@@ -37,6 +37,7 @@ pub struct Ppu {
     address_bus: u16,
     cycle_temp: u8,
     cycle_next_character: u8,
+    ppu_scroll_fine_x: u8,
 }
 
 impl Ppu {
@@ -81,6 +82,7 @@ impl Ppu {
             address_bus: 0,
             cycle_temp: 0,
             cycle_next_character: 0,
+            ppu_scroll_fine_x: 0,
         }
     }
 
@@ -353,7 +355,8 @@ impl Ppu {
                 self.use_8x16_sprites = value & 0x20 != 0;
                 self.enable_nmi = value & 0x80 != 0;
 
-                self.transfer_address = (self.transfer_address & 0xf3ff) | ((value as u16 & 0x03) << 10);
+                self.transfer_address =
+                    (self.transfer_address & 0xf3ff) | ((value as u16 & 0x03) << 10);
             }
             0x2001 => {
                 // PPU MASK
@@ -365,7 +368,19 @@ impl Ppu {
             0x2002 => {}
             0x2003 => {}
             0x2004 => {}
-            0x2005 => {}
+            0x2005 => {
+                // PPU Scroll
+                if !self.write_latch {
+                    self.ppu_scroll_fine_x = value & 7;
+                    self.transfer_address =
+                        (self.transfer_address & 0xffe0) | ((value >> 3) as u16);
+                } else {
+                    self.transfer_address = (self.transfer_address & 0x8c1f)
+                        | ((((value as u16) & 0xf8) << 2) | (((value as u16) & 0x07) << 12))
+                }
+
+                self.write_latch = !self.write_latch;
+            }
             0x2006 => {
                 // PPU ADDR
                 self.ppu_addr(value);
@@ -408,10 +423,11 @@ impl Ppu {
 
     pub fn ppu_addr(&mut self, value: u8) {
         if !self.write_latch {
-            self.transfer_address = ((value & 0x3F) as u16) << 8;
+            self.transfer_address =
+                (self.transfer_address & 0x00ff) | (((value as u16) & 0x3f) << 8);
         } else {
-            self.vram_address = self.transfer_address | value as u16;
-            self.transfer_address = self.vram_address;
+            self.transfer_address = (self.transfer_address & 0xFF00) | (value as u16);
+            self.vram_address = self.transfer_address;
         }
         self.write_latch = !self.write_latch;
     }
