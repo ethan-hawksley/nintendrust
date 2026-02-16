@@ -6,3 +6,4 @@ pub mod mappers;
 mod opcodes;
 pub mod ppu;
 pub mod rom;
+mod palette;

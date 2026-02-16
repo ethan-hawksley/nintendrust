@@ -2,6 +2,7 @@ use crate::cartridge::CartridgeInfo;
 use crate::cartridge::Mirroring::FourScreen;
 use crate::cartridge::Mirroring::Horizontal;
 use crate::cartridge::Mirroring::Vertical;
+use crate::palette::NES_PALETTE;
 
 pub struct Ppu {
     cartridge_info: CartridgeInfo,
@@ -9,7 +10,7 @@ pub struct Ppu {
     chr_is_ram: bool,
     vram: [u8; 2048],
     palette_ram: [u8; 32],
-    oam: [u8; 256],
+    pub oam: [u8; 256],
     write_latch: bool,
     vram_address: u16,
     transfer_address: u16,
@@ -38,6 +39,8 @@ pub struct Ppu {
     cycle_temp: u8,
     cycle_next_character: u8,
     ppu_scroll_fine_x: u8,
+    pub frame_buffer: [u32; 256 * 240],
+    pub frame_complete: bool,
 }
 
 impl Ppu {
@@ -83,6 +86,8 @@ impl Ppu {
             cycle_temp: 0,
             cycle_next_character: 0,
             ppu_scroll_fine_x: 0,
+            frame_buffer: [0; 256 * 240],
+            frame_complete: false,
         }
     }
 
@@ -464,11 +469,6 @@ impl Ppu {
     }
 
     pub fn emulate_ppu(&mut self) {
-        if self.ppu_dot == 1 && self.ppu_scanline == 241 {
-            self.v_blank = true;
-        } else if self.ppu_dot == 1 && self.ppu_scanline == 261 {
-            self.v_blank = false;
-        }
 
         let rendering_enabled = self.mask_render_background || self.mask_render_sprites;
         let visible_or_prerender = self.ppu_scanline < 240 || self.ppu_scanline == 261;
@@ -564,6 +564,51 @@ impl Ppu {
             if self.ppu_dot >= 280 && self.ppu_dot <= 304 && self.ppu_scanline == 261 {
                 self.reset_y_scroll();
             }
+        }
+
+        // Visible area: scanlines 0-239, dots 1-256.
+        if self.ppu_scanline < 240 && self.ppu_dot > 0 && self.ppu_dot <= 256 {
+            let x = (self.ppu_dot - 1) as usize;
+            let y = self.ppu_scanline as usize;
+
+            let mut palette_high = 0;
+            let mut palette_low = 0;
+
+            // Determine colour bits from shift registers
+            if self.mask_render_background && (self.ppu_dot > 8 || self.mask_background_8px) {
+                let col_0 =
+                    ((self.shift_register_pattern_l >> (15 - self.ppu_scroll_fine_x)) & 1) as u8;
+                let col_1 =
+                    ((self.shift_register_pattern_h >> (15 - self.ppu_scroll_fine_x)) & 1) as u8;
+                palette_low = (col_1 << 1) | col_0;
+
+                let pal_0 = (((self.shift_register_attribute_l) >> (15 - self.ppu_scroll_fine_x))
+                    & 1) as u8;
+                let pal_1 = (((self.shift_register_attribute_h) >> (15 - self.ppu_scroll_fine_x))
+                    & 1) as u8;
+                palette_high = (pal_1 << 1) | pal_0;
+
+                // Map PPU pixels to Palette RAM indicies
+                let palette_ram_addr = if palette_low == 0 {
+                    0
+                } else {
+                    (palette_high << 2) | palette_low
+                } as usize;
+
+                // Look up NES colour index from PPU Palette RAM
+                let nes_colour_index = (self.palette_ram[palette_ram_addr] & 0x3f) as usize;
+
+                // Look up the 0xRRGGBB value
+                self.frame_buffer[y * 256 + x] = NES_PALETTE[nes_colour_index];
+            }
+        }
+
+        // Signal a frame is done at the start of VBlank
+        if self.ppu_dot == 1 && self.ppu_scanline == 241 {
+            self.v_blank = true;
+            self.frame_complete = true;
+        } else if self.ppu_dot == 1 && self.ppu_scanline == 261 {
+            self.v_blank = false;
         }
 
         self.ppu_dot += 1;
