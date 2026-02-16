@@ -502,34 +502,27 @@ impl Ppu {
             (self.vram_address & 0b0000010000011111) | (self.transfer_address & 0b0111101111100000);
     }
 
-    fn get_sprite_pattern_address(&self) -> u16 {
+    fn get_sprite_pattern_address(&self, sprite_index: usize) -> u16 {
         if !self.use_8x16_sprites {
             // 8x8 sprites.
-            // Address is $0000 or $1000 depending on pattern table,
-            // Plus the pattern value from OAM * 16,
-            // Plus the number of scanlines from the top of the object.
-            // If the attributes are set to flip Y, it's 7 - the number of scanlines from the top of the object.
-            if ((self.sprite_attribute[self.secondary_oam_address as usize] >> 7) & 1) == 0 {
+            if ((self.sprite_attribute[sprite_index] >> 7) & 1) == 0 {
                 // Attributes are not set to flip Y.
                 (if self.sprite_pattern_table { 0x1000 } else { 0 })
-                    + ((self.sprite_pattern[self.secondary_oam_address as usize] as u16) << 4)
-                    + (self.ppu_scanline
-                        - (self.sprite_y_position[self.oam_address as usize] as u16))
+                    + ((self.sprite_pattern[sprite_index] as u16) << 4)
+                    + (self.ppu_scanline - (self.sprite_y_position[sprite_index] as u16))
             } else {
                 // Attributes are set to flip Y.
                 (if self.sprite_pattern_table { 0x1000 } else { 0 })
-                    + ((self.sprite_pattern[self.secondary_oam_address as usize] as u16) << 4)
+                    + ((self.sprite_pattern[sprite_index] as u16) << 4)
                     + (self.ppu_scanline
-                        - ((7
-                            - (self.ppu_scanline
-                                - self.sprite_y_position[self.oam_address as usize] as u16))
+                        - ((7 - (self.ppu_scanline - self.sprite_y_position[sprite_index] as u16))
                             & 7))
             }
         } else {
             // 8x16 sprites.
-            let sprite_pat = self.sprite_pattern[self.secondary_oam_address as usize];
-            let sprite_attr = self.sprite_attribute[self.secondary_oam_address as usize];
-            let sprite_y = self.sprite_y_position[self.oam_address as usize];
+            let sprite_pat = self.sprite_pattern[sprite_index];
+            let sprite_attr = self.sprite_attribute[sprite_index];
+            let sprite_y = self.sprite_y_position[sprite_index];
 
             let bank = if (sprite_pat & 1) == 1 {
                 0x1000
@@ -542,28 +535,15 @@ impl Ppu {
             if ((sprite_attr >> 7) & 1) == 0 {
                 // Attributes are not set to flip Y
                 if diff < 8 {
-                    // Top half of sprite: use top tile, normal row
                     bank | (tile_addr << 4) | diff
                 } else {
-                    // Bottom half of sprite: use bottom tile (tile + 1), normal row
-                    // (diff & 7) gives the row 0-7 within the second tile
                     bank | (tile_addr << 4) | 16 | (diff & 7)
                 }
             } else {
                 // Attributes are set to flip Y
                 if diff < 8 {
-                    // Top half of sprite on screen (physically top 8 pixels).
-                    // Because of Flip Y, this displays the Bottom tile's data, flipped vertically.
-                    // Row 0 of sprite shows Row 7 of Bottom tile.
-                    // Row 7 of sprite shows Row 0 of Bottom tile.
                     bank | (tile_addr << 4) | 16 | ((7_u16.wrapping_sub(diff)) & 7)
                 } else {
-                    // Bottom half of sprite on screen.
-                    // Because of Flip Y, this displays the Top tile's data, flipped vertically.
-                    // Row 8 of sprite shows Row 7 of Top tile.
-                    // Row 15 of sprite shows Row 0 of Top tile.
-                    // (diff & 7) is the offset into this 8px block (0-7).
-                    // We want row (7 - offset).
                     bank | (tile_addr << 4) | (7_u16.wrapping_sub(diff & 7))
                 }
             }
