@@ -35,6 +35,9 @@ pub struct Ppu {
     cycle_attribute: u8,
     pattern_low_bit_plane: u8,
     pattern_high_bit_plane: u8,
+    address_bus: u16,
+    cycle_temp: u8,
+    cycle_next_character: u8,
 }
 
 impl Ppu {
@@ -77,6 +80,9 @@ impl Ppu {
             cycle_attribute: 0,
             pattern_low_bit_plane: 0,
             pattern_high_bit_plane: 0,
+            address_bus: 0,
+            cycle_temp: 0,
+            cycle_next_character: 0,
         }
     }
 
@@ -247,7 +253,8 @@ impl Ppu {
                                 (palette_idx as usize * 4) + pixel_val
                             };
 
-                            let color_index = self.palette_ram[color_index_in_palette_ram] as usize;
+                            let color_index =
+                                (self.palette_ram[color_index_in_palette_ram] & 0x3f) as usize;
 
                             let (r, g, b) = palette[color_index];
 
@@ -291,18 +298,18 @@ impl Ppu {
         match address {
             ..0x2000 => {
                 // Read from pattern table
-                self.chr_memory[self.vram_address as usize]
+                self.chr_memory[address as usize]
             }
             0x2000..0x3F00 => {
                 // Read from nametables
-                let mapped_vram_address = self.map_vram_address(self.vram_address);
+                let mapped_vram_address = self.map_vram_address(address);
                 self.vram[mapped_vram_address as usize]
             }
             0x3F00.. => {
-                if (self.vram_address & 3) == 0 {
-                    self.palette_ram[(self.vram_address & 0x0F) as usize]
+                if (address & 3) == 0 {
+                    self.palette_ram[(address & 0x0F) as usize]
                 } else {
-                    self.palette_ram[(self.vram_address & 0x1F) as usize]
+                    self.palette_ram[(address & 0x1F) as usize]
                 }
             }
         }
@@ -322,9 +329,9 @@ impl Ppu {
                 let mut previous_buffer = self.read_buffer;
 
                 if self.vram_address >= 0x3f00 {
-                    previous_buffer = self.read_ppu(address);
+                    previous_buffer = self.read_ppu(self.vram_address);
                 } else {
-                    self.read_buffer = self.read_ppu(address);
+                    self.read_buffer = self.read_ppu(self.vram_address);
                 }
 
                 self.vram_address =
@@ -409,6 +416,37 @@ impl Ppu {
         self.write_latch = !self.write_latch;
     }
 
+    fn increment_y_scroll(&mut self) {
+        if (self.vram_address & 0x7000) != 0x7000 {
+            self.vram_address = self.vram_address.wrapping_add(0x1000);
+        } else {
+            self.vram_address &= 0x0fff;
+
+            let mut y = (self.vram_address & 0x03E0) >> 5;
+
+            if y == 29 {
+                // Reset the Y value and flip bit 11 of VRAM address.
+                y = 0;
+                self.vram_address ^= 0x0800;
+            } else {
+                y = y.wrapping_add(1);
+                y &= 0x1f;
+            }
+
+            self.vram_address = (self.vram_address & 0xfc1f) | (y << 5);
+        }
+    }
+
+    fn reset_x_scroll(&mut self) {
+        self.vram_address =
+            (self.vram_address & 0b0111101111100000) | (self.transfer_address & 0b0000010000011111);
+    }
+
+    fn reset_y_scroll(&mut self) {
+        self.vram_address =
+            (self.vram_address & 0b0000010000011111) | (self.transfer_address & 0b0111101111100000);
+    }
+
     pub fn emulate_ppu(&mut self) {
         if self.ppu_dot == 1 && self.ppu_scanline == 241 {
             self.v_blank = true;
@@ -436,17 +474,7 @@ impl Ppu {
             }
         }
 
-        self.ppu_dot += 1;
-
-        if self.ppu_dot >= 341 {
-            self.ppu_dot = 0;
-            self.ppu_scanline += 1;
-            if self.ppu_scanline >= 262 {
-                self.ppu_scanline = 0;
-            }
-        }
-
-        let cycle_tick: u8 = ((self.ppu_dot - 1) & 7) as u8;
+        let cycle_tick: u8 = (self.ppu_dot.wrapping_sub(1) & 7) as u8;
         match cycle_tick {
             0 => {
                 self.shift_register_pattern_l =
@@ -465,15 +493,84 @@ impl Ppu {
                     } else {
                         0
                     };
+
+                self.address_bus = 0x2000 + (self.vram_address & 0x0FFF);
+                self.cycle_temp = self.read_ppu(self.address_bus);
             }
-            1 => {}
-            2 => {}
-            3 => {}
-            4 => {}
-            5 => {}
-            6 => {}
-            7 => {}
+            1 => {
+                self.cycle_next_character = self.cycle_temp;
+            }
+            2 => {
+                self.address_bus = 0x23C0
+                    | (self.vram_address & 0x0C00)
+                    | ((self.vram_address >> 4) & 0x38)
+                    | ((self.vram_address >> 2) & 0x07);
+                self.cycle_temp = self.read_ppu(self.address_bus);
+            }
+            3 => {
+                self.cycle_attribute = self.cycle_temp;
+
+                // One byte of attribute data covers four tiles. Determine which tile this is for.
+                if (self.vram_address & 3) >= 2 {
+                    // If this is on the right tile.
+                    self.cycle_attribute >>= 2;
+                }
+                if (((self.vram_address & 0b0000001111100000) >> 5) & 3) >= 2 {
+                    // If this is on the bottom tile.
+                    self.cycle_attribute >>= 4;
+                }
+                self.cycle_attribute &= 3;
+            }
+            4 => {
+                self.address_bus = ((self.vram_address & 0b01110000000000000) >> 12)
+                    | self.cycle_next_character as u16 * 16
+                    | (if self.bg_pattern_table { 0x1000 } else { 0 });
+                self.cycle_temp = self.read_ppu(self.address_bus);
+            }
+            5 => {
+                self.pattern_low_bit_plane = self.cycle_temp;
+                self.address_bus = self.address_bus.wrapping_add(8);
+            }
+            6 => {
+                self.cycle_temp = self.read_ppu(self.address_bus);
+            }
+            7 => {
+                self.pattern_high_bit_plane = self.cycle_temp;
+
+                if (self.vram_address & 0x001f) == 31 {
+                    // Reset the scroll.
+                    self.vram_address &= 0xffe0;
+                    // Cross into next nametable.
+                    self.vram_address ^= 0x0400;
+                } else {
+                    self.vram_address = self.vram_address.wrapping_add(1);
+                }
+            }
             _ => unreachable!(),
         };
+
+        // If this is a visible scanline and rendering sprites / backgrounds is enabled:
+        if self.ppu_dot == 256 {
+            // The Y scroll is incremented on dot 256.
+            self.increment_y_scroll();
+        } else if self.ppu_dot == 257 {
+            // The X scroll is reset on dot 257.
+            self.reset_x_scroll();
+        }
+
+        if self.ppu_dot >= 280 && self.ppu_dot <= 304 && self.ppu_scanline == 261 {
+            // The Y scroll is reset on every dot from 280 through 304 on the pre-render calculation.
+            self.reset_y_scroll();
+        }
+
+        self.ppu_dot += 1;
+
+        if self.ppu_dot >= 341 {
+            self.ppu_dot = 0;
+            self.ppu_scanline += 1;
+            if self.ppu_scanline >= 262 {
+                self.ppu_scanline = 0;
+            }
+        }
     }
 }
