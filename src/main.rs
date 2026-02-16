@@ -1,9 +1,9 @@
 use image::ColorType::Rgb8;
+use minifb::{Scale, Window, WindowOptions};
 use nintendrust::bus::Bus;
 use nintendrust::cpu::Cpu;
 use nintendrust::rom::Rom;
 use std::fs;
-use minifb::{Scale, Window, WindowOptions};
 
 fn main() {
     let file_path = "Super Mario Bros.nes";
@@ -32,7 +32,8 @@ fn main() {
             scale: Scale::X2,
             ..WindowOptions::default()
         },
-    ).unwrap();
+    )
+    .unwrap();
 
     window.set_target_fps(60);
 
@@ -41,7 +42,9 @@ fn main() {
         while !bus.ppu.frame_complete && !cpu.halted {
             cpu.emulate_cpu(&mut bus);
         }
-        window.update_with_buffer(&bus.ppu.frame_buffer, 256, 240).unwrap();
+        window
+            .update_with_buffer(&bus.ppu.frame_buffer, 256, 240)
+            .unwrap();
     }
 
     // for _ in 0..1000000 {
