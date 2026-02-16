@@ -17,7 +17,7 @@ pub struct Ppu {
     vram_increment_32: bool,
     read_buffer: u8,
     ppu_dot: u16,
-    ppu_scanline: u16,
+    scanline: u16,
     pub v_blank: bool,
     mask_background_8px: bool,
     mask_sprites_8px: bool,
@@ -81,7 +81,7 @@ impl Ppu {
             vram_increment_32: false,
             read_buffer: 0,
             ppu_dot: 0,
-            ppu_scanline: 0,
+            scanline: 0,
             v_blank: false,
             mask_background_8px: false,
             mask_sprites_8px: false,
@@ -509,14 +509,13 @@ impl Ppu {
                 // Attributes are not set to flip Y.
                 (if self.sprite_pattern_table { 0x1000 } else { 0 })
                     + ((self.sprite_pattern[sprite_index] as u16) << 4)
-                    + (self.ppu_scanline - (self.sprite_y_position[sprite_index] as u16))
+                    + (self.scanline - (self.sprite_y_position[sprite_index] as u16))
             } else {
                 // Attributes are set to flip Y.
                 (if self.sprite_pattern_table { 0x1000 } else { 0 })
                     + ((self.sprite_pattern[sprite_index] as u16) << 4)
-                    + (self.ppu_scanline
-                        - ((7 - (self.ppu_scanline - self.sprite_y_position[sprite_index] as u16))
-                            & 7))
+                    + (self.scanline
+                        - ((7 - (self.scanline - self.sprite_y_position[sprite_index] as u16)) & 7))
             }
         } else {
             // 8x16 sprites.
@@ -530,7 +529,7 @@ impl Ppu {
                 0x0000
             };
             let tile_addr = (sprite_pat & 0xFE) as u16;
-            let diff = self.ppu_scanline.wrapping_sub(sprite_y as u16);
+            let diff = self.scanline.wrapping_sub(sprite_y as u16);
 
             if ((sprite_attr >> 7) & 1) == 0 {
                 // Attributes are not set to flip Y
@@ -581,8 +580,8 @@ impl Ppu {
                 // Even PPU cycles store the value in secondary OAM.
                 if self.sprite_evaluation_tick == 0 {
                     // Reading index 0 of an object's set of four bytes.
-                    if self.ppu_scanline >= self.sprite_evaluation_temp as u16
-                        && (self.ppu_scanline - self.sprite_evaluation_temp as u16)
+                    if self.scanline >= self.sprite_evaluation_temp as u16
+                        && (self.scanline - self.sprite_evaluation_temp as u16)
                             < (if self.use_8x16_sprites { 16 } else { 8 })
                     {
                         // This object is on the scanline.
@@ -653,12 +652,44 @@ impl Ppu {
                     self.sprite_x_position[(self.secondary_oam_address / 4) as usize] =
                         self.secondary_oam[self.secondary_oam_address as usize];
                 }
-                4 => {}
-                5 => {}
+                4 => {
+                    let sprite_index = (self.secondary_oam_address / 4) as usize;
+                    self.address_bus = self.get_sprite_pattern_address(sprite_index);
+                }
+                5 => {
+                    self.sprite_evaluation_temp = self.read_ppu(self.address_bus);
+                    if self.scanline == 261 {
+                        // Clear if this is the pre-render line.
+                        self.sprite_evaluation_temp = 0;
+                    }
+                    if ((self.sprite_attribute[(self.secondary_oam_address / 4) as usize] >> 6) & 1)
+                        == 1
+                    {
+                        // Attributes are set up to flip X.
+                        self.sprite_evaluation_temp = self.sprite_evaluation_temp.reverse_bits();
+                    }
+                    self.sprite_shift_register_l[(self.secondary_oam_address / 4) as usize] =
+                        self.sprite_evaluation_temp;
+                }
                 6 => {
                     self.address_bus += 8;
                 }
-                7 => {}
+                7 => {
+                    self.sprite_evaluation_temp = self.read_ppu(self.address_bus);
+                    if self.scanline == 261 {
+                        // Clear if this is the pre-render line.
+                        self.sprite_evaluation_temp = 0;
+                    }
+                    if ((self.sprite_attribute[(self.secondary_oam_address / 4) as usize] >> 6) & 1)
+                        == 1
+                    {
+                        // Attributes are set up to flip X.
+                        self.sprite_evaluation_temp = self.sprite_evaluation_temp.reverse_bits();
+                    }
+                    self.sprite_shift_register_h[(self.secondary_oam_address / 4) as usize] =
+                        self.sprite_evaluation_temp;
+                    self.oam_address += 1;
+                }
                 _ => unreachable!(),
             }
             self.sprite_evaluation_tick += 1;
@@ -669,7 +700,7 @@ impl Ppu {
 
     pub fn emulate_ppu(&mut self) {
         let rendering_enabled = self.mask_render_background || self.mask_render_sprites;
-        let visible_or_prerender = self.ppu_scanline < 240 || self.ppu_scanline == 261;
+        let visible_or_prerender = self.scanline < 240 || self.scanline == 261;
         let fetching_dot = (self.ppu_dot > 0 && self.ppu_dot <= 256)
             || (self.ppu_dot > 320 && self.ppu_dot <= 336);
 
@@ -759,15 +790,15 @@ impl Ppu {
                 self.reset_x_scroll();
             }
 
-            if self.ppu_dot >= 280 && self.ppu_dot <= 304 && self.ppu_scanline == 261 {
+            if self.ppu_dot >= 280 && self.ppu_dot <= 304 && self.scanline == 261 {
                 self.reset_y_scroll();
             }
         }
 
         // Visible area: scanlines 0-239, dots 1-256.
-        if self.ppu_scanline < 240 && self.ppu_dot > 0 && self.ppu_dot <= 256 {
+        if self.scanline < 240 && self.ppu_dot > 0 && self.ppu_dot <= 256 {
             let x = (self.ppu_dot - 1) as usize;
-            let y = self.ppu_scanline as usize;
+            let y = self.scanline as usize;
 
             let mut palette_high = 0;
             let mut palette_low = 0;
@@ -802,19 +833,19 @@ impl Ppu {
         }
 
         // Signal a frame is done at the start of VBlank
-        if self.ppu_dot == 1 && self.ppu_scanline == 241 {
+        if self.ppu_dot == 1 && self.scanline == 241 {
             self.v_blank = true;
             self.frame_complete = true;
-        } else if self.ppu_dot == 1 && self.ppu_scanline == 261 {
+        } else if self.ppu_dot == 1 && self.scanline == 261 {
             self.v_blank = false;
         }
 
         self.ppu_dot += 1;
         if self.ppu_dot >= 341 {
             self.ppu_dot = 0;
-            self.ppu_scanline += 1;
-            if self.ppu_scanline >= 262 {
-                self.ppu_scanline = 0;
+            self.scanline += 1;
+            if self.scanline >= 262 {
+                self.scanline = 0;
             }
         }
     }
