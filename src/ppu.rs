@@ -50,6 +50,7 @@ pub struct Ppu {
     status_overflow: bool,
     status_sprite_zero_hit: bool,
     scanline_contains_sprite_zero: bool,
+    sprite_zero_on_next_scanline: bool,
     sprite_evaluation_oam_overflowed: bool,
     pub secondary_oam_size: u8,
     pub sprite_shift_register_l: [u8; 8],
@@ -114,6 +115,7 @@ impl Ppu {
             status_overflow: false,
             status_sprite_zero_hit: false,
             scanline_contains_sprite_zero: false,
+            sprite_zero_on_next_scanline: false,
             sprite_evaluation_oam_overflowed: false,
             secondary_oam_size: 0,
             sprite_shift_register_l: [0; 8],
@@ -330,7 +332,7 @@ impl Ppu {
             0x2002 => {
                 0 | (self.v_blank as u8) << 7
                     | (self.status_sprite_zero_hit as u8) << 6
-                    | (self.status_overflow as u8) << 1
+                    | (self.status_overflow as u8) << 5
             }
             0x2007 => self.read_buffer,
             _ => 0,
@@ -365,7 +367,7 @@ impl Ppu {
                 let status = 0
                     | (self.v_blank as u8) << 7
                     | (self.status_sprite_zero_hit as u8) << 6
-                    | (self.status_overflow as u8) << 1;
+                    | (self.status_overflow as u8) << 5;
 
                 self.v_blank = false;
                 self.write_latch = false;
@@ -521,9 +523,8 @@ impl Ppu {
             } else {
                 // Attributes are set to flip Y.
                 (if self.sprite_pattern_table { 0x1000u16 } else { 0u16 })
-                    .wrapping_add((self.sprite_pattern[sprite_index] as u16) << 4)
-                    .wrapping_add(self.scanline
-                        .wrapping_sub((7u16.wrapping_sub(self.scanline.wrapping_sub(self.sprite_y_position[sprite_index] as u16))) & 7))
+                    + ((self.sprite_pattern[sprite_index] as u16) << 4)
+                    + (7 - (self.scanline.wrapping_sub(self.sprite_y_position[sprite_index] as u16) & 7))
             }
         } else {
             // 8x16 sprites.
@@ -601,7 +602,7 @@ impl Ppu {
                             self.oam_address += 1;
                             if self.ppu_dot == 66 {
                                 // Index 0 is evaluated on PPU dot 66
-                                self.scanline_contains_sprite_zero = true;
+                                self.sprite_zero_on_next_scanline = true;
                             }
                         } else {
                             self.status_overflow = true;
@@ -636,7 +637,8 @@ impl Ppu {
                 self.secondary_oam_size = self.secondary_oam_address;
                 self.secondary_oam_address = 0;
                 self.sprite_evaluation_tick = 0;
-                self.scanline_contains_sprite_zero = false;
+                self.scanline_contains_sprite_zero = self.sprite_zero_on_next_scanline;
+                self.sprite_zero_on_next_scanline = false;
             }
             match self.sprite_evaluation_tick {
                 0 => {
@@ -736,20 +738,7 @@ impl Ppu {
                     self.shift_register_attribute_h <<= 1;
                 }
 
-                if self.mask_render_sprites
-                    && self.scanline < 240
-                    && self.ppu_dot >= 1
-                    && self.ppu_dot <= 256
-                {
-                    for i in 0..8 {
-                        if self.sprite_x_position[i] > 0 {
-                            self.sprite_x_position[i] -= 1;
-                        } else {
-                            self.sprite_shift_register_l[i] <<= 1;
-                            self.sprite_shift_register_h[i] <<= 1;
-                        }
-                    }
-                }
+                // Sprite X countdown / shift is done after pixel drawing (see below).
 
                 let cycle_tick: u8 = (self.ppu_dot.wrapping_sub(1) & 7) as u8;
                 match cycle_tick {
@@ -915,6 +904,23 @@ impl Ppu {
 
             // Look up the 0xRRGGBB value
             self.frame_buffer[y * 256 + x] = NES_PALETTE[nes_colour_index];
+        }
+
+        // Sprite X countdown and shift registers - done AFTER pixel drawing so
+        // the current shift register state is read before being advanced.
+        if self.mask_render_sprites
+            && self.scanline < 240
+            && self.ppu_dot >= 1
+            && self.ppu_dot <= 256
+        {
+            for i in 0..8 {
+                if self.sprite_x_position[i] > 0 {
+                    self.sprite_x_position[i] -= 1;
+                } else {
+                    self.sprite_shift_register_l[i] <<= 1;
+                    self.sprite_shift_register_h[i] <<= 1;
+                }
+            }
         }
 
         self.ppu_dot += 1;
