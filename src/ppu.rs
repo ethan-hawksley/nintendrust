@@ -41,6 +41,23 @@ pub struct Ppu {
     ppu_scroll_fine_x: u8,
     pub frame_buffer: [u32; 256 * 240],
     pub frame_complete: bool,
+    secondary_oam: [u8; 32],
+    sprite_evaluation_temp: u8,
+    secondary_oam_address: u8,
+    secondary_oam_full: bool,
+    oam_address: u16,
+    sprite_evaluation_tick: u8,
+    status_overflow: bool,
+    status_sprite_zero_hit: bool,
+    scanline_contains_sprite_zero: bool,
+    sprite_evaluation_oam_overflowed: bool,
+    pub secondary_oam_size: u8,
+    pub sprite_shift_register_l: [u8; 8],
+    pub sprite_shift_register_h: [u8; 8],
+    pub sprite_attribute: [u8; 8],
+    pub sprite_pattern: [u8; 8],
+    pub sprite_x_position: [u8; 8],
+    pub sprite_y_position: [u8; 8],
 }
 
 impl Ppu {
@@ -88,6 +105,23 @@ impl Ppu {
             ppu_scroll_fine_x: 0,
             frame_buffer: [0; 256 * 240],
             frame_complete: false,
+            secondary_oam: [0; 32],
+            sprite_evaluation_temp: 0,
+            secondary_oam_address: 0,
+            secondary_oam_full: false,
+            oam_address: 0,
+            sprite_evaluation_tick: 0,
+            status_overflow: false,
+            status_sprite_zero_hit: false,
+            scanline_contains_sprite_zero: false,
+            sprite_evaluation_oam_overflowed: false,
+            secondary_oam_size: 0,
+            sprite_shift_register_l: [0; 8],
+            sprite_shift_register_h: [0; 8],
+            sprite_attribute: [0; 8],
+            sprite_pattern: [0; 8],
+            sprite_x_position: [0; 8],
+            sprite_y_position: [0; 8],
         }
     }
 
@@ -468,8 +502,122 @@ impl Ppu {
             (self.vram_address & 0b0000010000011111) | (self.transfer_address & 0b0111101111100000);
     }
 
-    pub fn emulate_ppu(&mut self) {
+    fn sprite_evaluation(&mut self) {
+        if self.ppu_dot == 0 {
+            self.secondary_oam_address = 0;
+            self.secondary_oam_full = false;
+        } else if self.ppu_dot > 0 && self.ppu_dot <= 64 {
+            if (self.ppu_dot & 1) == 1 {
+                // Odd PPU cycles load the value $FF
+                self.sprite_evaluation_temp = 0xff;
+            } else {
+                // Even PPU cycles store the value in Secondary OAM
+                self.secondary_oam[self.secondary_oam_address as usize] =
+                    self.sprite_evaluation_temp;
+                self.secondary_oam_address += 1;
+                // Address stays between $00 and $1f
+                self.secondary_oam_address &= 0x1f;
+            }
+        } else if self.ppu_dot > 64 && self.ppu_dot <= 256 {
+            if (self.ppu_dot & 1) == 1 {
+                // Odd PPU cycles load the value from OAM.
+                self.sprite_evaluation_temp = self.oam[self.oam_address as usize]
+            } else {
+                if (!self.sprite_evaluation_oam_overflowed) {
+                    if !self.secondary_oam_full {
+                        // If secondary OAM isn't full, the write always occurs.
+                        self.secondary_oam[self.secondary_oam_address as usize] =
+                            self.sprite_evaluation_temp;
+                    }
+                }
+                // Even PPU cycles store the value in secondary OAM.
+                if self.sprite_evaluation_tick == 0 {
+                    // Reading index 0 of an object's set of four bytes.
+                    if self.ppu_scanline >= self.sprite_evaluation_temp as u16
+                        && (self.ppu_scanline - self.sprite_evaluation_temp as u16)
+                            < (if self.use_8x16_sprites { 16 } else { 8 })
+                    {
+                        // This object is on the scanline.
+                        if !self.secondary_oam_full {
+                            // Increment for next write to secondary OAM.
+                            self.secondary_oam_address += 1;
+                            // Increment for next read from OAM.
+                            self.oam_address += 1;
+                            if self.ppu_dot == 66 {
+                                // Index 0 is evaluated on PPU dot 66
+                                self.scanline_contains_sprite_zero = true;
+                            }
+                        } else {
+                            self.status_overflow = true;
+                        }
+                        self.sprite_evaluation_tick += 1;
+                    } else {
+                        self.oam_address += 4;
+                    }
+                } else {
+                    // Reading index 1, 2, or 3 of an object's OAM data.
+                    // Increment for next write to secondary OAM
+                    self.secondary_oam_address += 1;
+                    // Increment for next read from OAM
+                    self.oam_address += 1;
 
+                    if self.secondary_oam_address == 0x20 {
+                        self.secondary_oam_full = true;
+                    }
+                    self.sprite_evaluation_tick += 1;
+                    // Wrap to tick 0 after tick 3.
+                    self.sprite_evaluation_tick &= 3;
+                }
+                if self.oam_address == 0 {
+                    // If OAM overflowed, stop running sprite evaluation until dot 257.
+                    self.sprite_evaluation_oam_overflowed = true;
+                }
+            }
+        } else if self.ppu_dot > 256 && self.ppu_dot <= 320 {
+            // Address reset to $00 during every one of these cycles.
+            self.oam_address = 0;
+            if self.ppu_dot == 257 {
+                self.secondary_oam_size = self.secondary_oam_address;
+                self.secondary_oam_address = 0;
+                self.sprite_evaluation_tick = 0;
+            }
+            match self.sprite_evaluation_tick {
+                0 => {
+                    // Set this object's Y position in the array.
+                    self.sprite_y_position[(self.secondary_oam_address / 4) as usize] =
+                        self.secondary_oam[self.secondary_oam_address as usize];
+                    self.secondary_oam_address += 1;
+                }
+                1 => {
+                    // Set this object's pattern in the array.
+                    self.sprite_pattern[(self.secondary_oam_address / 4) as usize] =
+                        self.secondary_oam[self.secondary_oam_address as usize];
+                    self.secondary_oam_address += 1;
+                }
+                2 => {
+                    // Set this object's attributes in the array.
+                    self.sprite_attribute[(self.secondary_oam_address / 4) as usize] =
+                        self.secondary_oam[self.secondary_oam_address as usize];
+                    self.secondary_oam_address += 1;
+                }
+                3 => {
+                    // Set this object's X position in the array.
+                    self.sprite_attribute[(self.secondary_oam_address / 4) as usize] =
+                        self.secondary_oam[self.secondary_oam_address as usize];
+                }
+                4 => {}
+                5 => {}
+                6 => {}
+                7 => {}
+                _ => unreachable!(),
+            }
+            self.sprite_evaluation_tick += 1;
+            // Reset tick at 8.
+            self.sprite_evaluation_tick &= 7;
+        }
+    }
+
+    pub fn emulate_ppu(&mut self) {
         let rendering_enabled = self.mask_render_background || self.mask_render_sprites;
         let visible_or_prerender = self.ppu_scanline < 240 || self.ppu_scanline == 261;
         let fetching_dot = (self.ppu_dot > 0 && self.ppu_dot <= 256)
