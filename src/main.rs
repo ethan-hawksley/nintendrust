@@ -1,5 +1,5 @@
 use image::ColorType::Rgb8;
-use minifb::{Scale, Window, WindowOptions};
+use minifb::{Key, Scale, Window, WindowOptions};
 use nintendrust::bus::Bus;
 use nintendrust::cpu::Cpu;
 use nintendrust::rom::Rom;
@@ -39,6 +39,31 @@ fn main() {
 
     while window.is_open() {
         bus.ppu.frame_complete = false;
+        bus.controller.reset_controllers();
+        if window.is_key_down(Key::Right) {
+            bus.controller.right_p1();
+        }
+        if window.is_key_down(Key::Left) {
+            bus.controller.left_p1();
+        }
+        if window.is_key_down(Key::Down) {
+            bus.controller.down_p1();
+        }
+        if window.is_key_down(Key::Up) {
+            bus.controller.up_p1();
+        }
+        if window.is_key_down(Key::Z) {
+            bus.controller.a_p1();
+        }
+        if window.is_key_down(Key::X) {
+            bus.controller.b_p1();
+        }
+        if window.is_key_down(Key::Enter) {
+            bus.controller.start_p1();
+        }
+        if window.is_key_down(Key::Space) {
+            bus.controller.select_p1();
+        }
         while !bus.ppu.frame_complete && !cpu.halted {
             cpu.emulate_cpu(&mut bus);
         }
