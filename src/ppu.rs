@@ -524,16 +524,32 @@ impl Ppu {
     fn get_sprite_pattern_address(&self, sprite_index: usize) -> u16 {
         if !self.use_8x16_sprites {
             // 8x8 sprites.
-            if ((self.sprite_attribute[sprite_index] >> 7) & 1) == 0 {
+            if ((self.sprite_attribute[sprite_index & 0x07] >> 7) & 1) == 0 {
                 // Attributes are not set to flip Y.
-                (if self.sprite_pattern_table { 0x1000 } else { 0 })
-                    + ((self.sprite_pattern[sprite_index] as u16) << 4)
-                    + (self.scanline - (self.sprite_y_position[sprite_index] as u16))
+                (if self.sprite_pattern_table {
+                    0x1000u16
+                } else {
+                    0u16
+                })
+                .wrapping_add((self.sprite_pattern[sprite_index & 0x07] as u16) << 4)
+                .wrapping_add(
+                    self.scanline
+                        .wrapping_sub(self.sprite_y_position[sprite_index & 0x07] as u16),
+                )
             } else {
                 // Attributes are set to flip Y.
-                (if self.sprite_pattern_table { 0x1000u16 } else { 0u16 })
-                    + ((self.sprite_pattern[sprite_index] as u16) << 4)
-                    + (7 - (self.scanline.wrapping_sub(self.sprite_y_position[sprite_index] as u16) & 7))
+                (if self.sprite_pattern_table {
+                    0x1000u16
+                } else {
+                    0u16
+                })
+                .wrapping_add((self.sprite_pattern[sprite_index & 0x07] as u16) << 4)
+                .wrapping_add(
+                    7 - (self
+                        .scanline
+                        .wrapping_sub(self.sprite_y_position[sprite_index & 0x07] as u16)
+                        & 7),
+                )
             }
         } else {
             // 8x16 sprites.
@@ -578,7 +594,7 @@ impl Ppu {
                 self.sprite_evaluation_temp = 0xff;
             } else {
                 // Even PPU cycles store the value in Secondary OAM
-                self.secondary_oam[self.secondary_oam_address as usize] =
+                self.secondary_oam[(self.secondary_oam_address as usize) & 0x1f] =
                     self.sprite_evaluation_temp;
                 self.secondary_oam_address += 1;
                 // Address stays between $00 and $1f
@@ -590,7 +606,7 @@ impl Ppu {
                 self.sprite_evaluation_temp = self.oam[self.oam_address as usize]
             } else {
                 if !self.sprite_evaluation_oam_overflowed {
-                    if !self.secondary_oam_full {
+                    if !self.secondary_oam_full && self.secondary_oam_address < 32 {
                         // If secondary OAM isn't full, the write always occurs.
                         self.secondary_oam[self.secondary_oam_address as usize] =
                             self.sprite_evaluation_temp;
@@ -606,7 +622,9 @@ impl Ppu {
                         // This object is on the scanline.
                         if !self.secondary_oam_full {
                             // Increment for next write to secondary OAM.
-                            self.secondary_oam_address += 1;
+                            if self.secondary_oam_address < 32 {
+                                self.secondary_oam_address += 1;
+                            }
                             // Increment for next read from OAM.
                             self.oam_address += 1;
                             if self.ppu_dot == 66 {
@@ -623,7 +641,9 @@ impl Ppu {
                 } else {
                     // Reading index 1, 2, or 3 of an object's OAM data.
                     // Increment for next write to secondary OAM
-                    self.secondary_oam_address += 1;
+                    if self.secondary_oam_address < 32 {
+                        self.secondary_oam_address += 1;
+                    }
                     // Increment for next read from OAM
                     self.oam_address = self.oam_address.wrapping_add(1);
 
@@ -652,26 +672,26 @@ impl Ppu {
             match self.sprite_evaluation_tick {
                 0 => {
                     // Set this object's Y position in the array.
-                    self.sprite_y_position[(self.secondary_oam_address / 4) as usize] =
-                        self.secondary_oam[self.secondary_oam_address as usize];
+                    self.sprite_y_position[((self.secondary_oam_address / 4) as usize) & 0x07] =
+                        self.secondary_oam[(self.secondary_oam_address as usize) & 0x1f];
                     self.secondary_oam_address += 1;
                 }
                 1 => {
                     // Set this object's pattern in the array.
-                    self.sprite_pattern[(self.secondary_oam_address / 4) as usize] =
-                        self.secondary_oam[self.secondary_oam_address as usize];
+                    self.sprite_pattern[((self.secondary_oam_address / 4) as usize) & 0x07] =
+                        self.secondary_oam[(self.secondary_oam_address as usize) & 0x1f];
                     self.secondary_oam_address += 1;
                 }
                 2 => {
                     // Set this object's attributes in the array.
-                    self.sprite_attribute[(self.secondary_oam_address / 4) as usize] =
-                        self.secondary_oam[self.secondary_oam_address as usize];
+                    self.sprite_attribute[((self.secondary_oam_address / 4) as usize) & 0x07] =
+                        self.secondary_oam[(self.secondary_oam_address as usize) & 0x1f];
                     self.secondary_oam_address += 1;
                 }
                 3 => {
                     // Set this object's X position in the array.
-                    self.sprite_x_position[(self.secondary_oam_address / 4) as usize] =
-                        self.secondary_oam[self.secondary_oam_address as usize];
+                    self.sprite_x_position[((self.secondary_oam_address / 4) as usize) & 0x07] =
+                        self.secondary_oam[(self.secondary_oam_address as usize) & 0x1f];
                 }
                 4 => {
                     let sprite_index = (self.secondary_oam_address / 4) as usize;
@@ -683,13 +703,16 @@ impl Ppu {
                         // Clear if this is the pre-render line.
                         self.sprite_evaluation_temp = 0;
                     }
-                    if ((self.sprite_attribute[(self.secondary_oam_address / 4) as usize] >> 6) & 1)
+                    if ((self.sprite_attribute[((self.secondary_oam_address / 4) as usize) & 0x07]
+                        >> 6)
+                        & 1)
                         == 1
                     {
                         // Attributes are set up to flip X.
                         self.sprite_evaluation_temp = self.sprite_evaluation_temp.reverse_bits();
                     }
-                    self.sprite_shift_register_l[(self.secondary_oam_address / 4) as usize] =
+                    self.sprite_shift_register_l
+                        [((self.secondary_oam_address / 4) as usize) & 0x07] =
                         self.sprite_evaluation_temp;
                 }
                 6 => {
@@ -701,13 +724,16 @@ impl Ppu {
                         // Clear if this is the pre-render line.
                         self.sprite_evaluation_temp = 0;
                     }
-                    if ((self.sprite_attribute[(self.secondary_oam_address / 4) as usize] >> 6) & 1)
+                    if ((self.sprite_attribute[((self.secondary_oam_address / 4) as usize) & 0x07]
+                        >> 6)
+                        & 1)
                         == 1
                     {
                         // Attributes are set up to flip X.
                         self.sprite_evaluation_temp = self.sprite_evaluation_temp.reverse_bits();
                     }
-                    self.sprite_shift_register_h[(self.secondary_oam_address / 4) as usize] =
+                    self.sprite_shift_register_h
+                        [((self.secondary_oam_address / 4) as usize) & 0x07] =
                         self.sprite_evaluation_temp;
                     self.secondary_oam_address += 1;
                 }
