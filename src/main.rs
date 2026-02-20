@@ -6,7 +6,7 @@ use nintendrust::rom::Rom;
 use std::fs;
 
 fn main() {
-    let file_path = "Super Mario Bros.nes";
+    let file_path = "Zooming_Secretary.nes";
     let raw_bytes = match fs::read(file_path) {
         Ok(bytes) => bytes,
         Err(e) => {
