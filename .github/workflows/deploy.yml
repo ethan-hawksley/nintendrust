@@ -1,0 +1,65 @@
+name: Deploy Nintendrust to GitHub Pages
+
+on:
+  # Trigger the workflow on pushes to the main branch
+  push:
+    branches: ["main", "master"]
+  # Allow manual triggers from the Actions tab
+  workflow_dispatch:
+
+# Set permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Build WebAssembly
+        # Compiles the Rust code to WASM and outputs JS wrappers into the pkg/ directory
+        run: wasm-pack build --target web --release
+
+      - name: Prepare Distribution Directory
+        # Move the files needed for the web server into a 'dist' folder
+        run: |
+          mkdir dist
+          cp index.html dist/
+          cp -r pkg dist/
+          cp *.nes dist/ || true
+
+      - name: Setup GitHub Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './dist'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
