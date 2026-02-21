@@ -4,5 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-image = "0.25.9"
-minifb = "0.28.0"
+wasm-bindgen = "0.2.109"
+
+[lib]
+crate-type = ["cdylib", "rlib"]

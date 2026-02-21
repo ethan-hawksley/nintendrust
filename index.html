@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Nintendrust Web</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            color: #fff;
+            background-color: #222;
+            font-family: system-ui, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            height: 100dvh;
+            overflow: hidden;
+        }
+
+        #app {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            height: 100%;
+            margin: 1rem;
+        }
+
+        footer {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        button {
+            color: inherit;
+            background: inherit;
+        }
+
+        #rom-input {
+            display: none;
+        }
+
+        canvas {
+            max-width: 100%;
+            height: 100%;
+            flex-grow: 1;
+            image-rendering: pixelated;
+            background: #000;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+            aspect-ratio: 256/240;
+        }
+    </style>
+</head>
+<body>
+<div id="app">
+    <h1>Nintendrust</h1>
+    <canvas id="screen" width="256" height="240"></canvas>
+    <footer>
+        <button id="rom-button">Load .nes NROM File</button>
+        <input id="rom-input" type="file" accept=".nes">
+        <button id="example-rom-button">Load Example ROM<br/>(Zooming Secretary)</button>
+    </footer>
+</div>
+
+<script type="module">
+  import init, {Emulator} from './pkg/nintendrust.js';
+
+  let emu = null;
+
+  // NES Controller Mapping
+  const KEY_MAP = {
+    'KeyZ': 0x80, // A
+    'KeyX': 0x40, // B
+    'Space': 0x20, // Select
+    'Enter': 0x10, // Start
+    'ArrowUp': 0x08, // Up
+    'ArrowDown': 0x04, // Down
+    'ArrowLeft': 0x02, // Left
+    'ArrowRight': 0x01  // Right
+  };
+
+  let joypadState = 0;
+
+  window.addEventListener('keydown', e => {
+    // Lookup the key code in the map
+    if (KEY_MAP[e.code] !== undefined) {
+      e.preventDefault();
+      joypadState |= KEY_MAP[e.code];
+    }
+  });
+
+  window.addEventListener('keyup', e => {
+    // Lookup the key code in the map
+    if (KEY_MAP[e.code] !== undefined) {
+      e.preventDefault();
+      joypadState &= ~KEY_MAP[e.code];
+    }
+  });
+
+  const romButton = document.getElementById('rom-button');
+  const romInput = document.getElementById('rom-input');
+  romButton.addEventListener('click', () => {
+    romInput.click();
+  });
+
+  romInput.addEventListener('change', async () => {
+    const file = romInput.files[0];
+    if (file) {
+      // Convert file to URL for the emulator
+      const objectUrl = URL.createObjectURL(file);
+      await run(objectUrl).catch(console.error);
+      // Clear the memory after it is finished
+      URL.revokeObjectURL(objectUrl);
+    }
+  });
+
+  document.getElementById('example-rom-button').addEventListener('click', async () => {
+    await run('Zooming_Secretary.nes').catch(console.error);
+  });
+
+  async function run(url) {
+    // Load the Wasm module
+    await init();
+
+    // Fetch ROM file
+    const romResponse = await fetch(url);
+    const romBuffer = await romResponse.arrayBuffer();
+
+    // Initialize the Emulator with the ROM bytes
+    const active = emu !== null;
+    emu = new Emulator(new Uint8Array(romBuffer));
+
+    const canvas = document.getElementById('screen');
+    const ctx = canvas.getContext('2d');
+    const imageData = ctx.createImageData(256, 240);
+
+
+    // The main emulation loop
+    function loop() {
+      // Send inputs to Rust
+      emu.set_input(joypadState);
+
+      // Emulate one frame
+      emu.step_frame();
+
+      // Get the pixel data and draw it to the Canvas
+      const pixels = emu.get_pixels();
+      imageData.data.set(pixels);
+      ctx.putImageData(imageData, 0, 0);
+
+      // Queue next frame
+      requestAnimationFrame(loop);
+    }
+
+    if (!active) {
+      loop();
+    }
+  }
+</script>
+</body>
+</html>
