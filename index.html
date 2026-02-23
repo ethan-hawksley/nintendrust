@@ -158,6 +158,9 @@
 
     // Initialize the Emulator with the ROM bytes
     const active = emu !== null;
+    if (emu) {
+      emu.free();
+    }
     emu = new Emulator(new Uint8Array(romBuffer));
 
     const canvas = document.getElementById('screen');
