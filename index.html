@@ -43,6 +43,25 @@
         button {
             color: inherit;
             background: inherit;
+            width: 9rem;
+            height: 3rem;
+            transition: border-color 250ms ease-out;
+        }
+
+        button:hover {
+            border-color: #ff4f00;
+        }
+
+        a {
+            padding: 1rem 0.5rem 1rem 0.5rem;
+            margin-left: -0.5rem;
+            margin-right: -0.5rem;
+            color: inherit;
+            transition: color 250ms ease-out;
+        }
+
+        a:hover {
+            color: #ff4f00;
         }
 
         #rom-input {
@@ -65,9 +84,11 @@
     <h1>Nintendrust</h1>
     <canvas id="screen" width="256" height="240"></canvas>
     <footer>
-        <button id="rom-button">Load .nes NROM File</button>
+        <button class="emulator-button" id="rom-button">Load local .nes NROM File</button>
         <input id="rom-input" type="file" accept=".nes">
-        <button id="example-rom-button">Load Example ROM<br/>(Zooming Secretary)</button>
+        <button class="emulator-button" id="example-rom-button">Load Example ROM (Zooming&nbsp;Secretary)</button>
+        <a href="https://hawksley.dev/">Home</a>
+        <a href="https://github.com/ethan-hawksley/nintendrust">Source Code</a>
     </footer>
 </div>
 
