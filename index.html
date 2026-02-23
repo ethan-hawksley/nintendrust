@@ -2,13 +2,33 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Nintendrust - NES Emulator</title>
-    <meta name="description" content="Nintendrust, an online NES emulator by Ethan Hawksley. Supports all official NROM games.">
+    <link rel="icon" type="image/svg+xml" href="https://hawksley.dev/favicon.svg?v=2">
+    <link rel="canonical" href="https://hawksley.dev/nintendrust/">
+
+    <meta name="description"
+          content="Nintendrust, an online NES emulator by Ethan Hawksley. Supports all official NROM games.">
+    <meta property="og:title" content="Nintendrust - NES Emulator">
+    <meta property="og:description"
+          content="Nintendrust, an online NES emulator by Ethan Hawksley. Supports all official NROM games.">
+    <meta property="og:site_name" content="Ethan Hawksley">
+    <meta property="og:locale" content="en_GB">
+    <meta property="og:image" content="https://hawksley.dev/og-image-1200x630.png?v=2">
+    <meta property="og:image:alt" content="Ethan Hawksley | Software Developer &#38; CS Student">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:type" content="image/png">
+
+    <meta name="twitter:card" content="summary_large_image">
     <style>
         * {
             box-sizing: border-box;
-            margin: 0;
             padding: 0;
+        }
+
+        *:not(dialog) {
+            margin: 0;
         }
 
         body {
@@ -36,6 +56,7 @@
         footer {
             display: flex;
             justify-content: center;
+            flex-wrap: wrap;
             align-items: center;
             gap: 1rem;
         }
@@ -43,13 +64,37 @@
         button {
             color: inherit;
             background: inherit;
-            width: 9rem;
-            height: 3rem;
             transition: border-color 250ms ease-out;
         }
 
+
         button:hover {
             border-color: #ff4f00;
+        }
+
+        .emulator-button {
+            width: 9rem;
+            height: 3rem;
+        }
+
+        #controls {
+            width: 3rem;
+            height: 3rem;
+        }
+
+        #controls-dialog {
+            padding: 2rem;
+        }
+
+        #controls-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+
+        #controls-list li {
+            display: grid;
+            grid-template-columns: 3.5rem 1rem 1fr;
         }
 
         a {
@@ -87,13 +132,38 @@
         <button class="emulator-button" id="rom-button">Load local .nes NROM File</button>
         <input id="rom-input" type="file" accept=".nes">
         <button class="emulator-button" id="example-rom-button">Load Example ROM (Zooming&nbsp;Secretary)</button>
+        <button id="controls">?</button>
         <a href="https://hawksley.dev/">Home</a>
         <a href="https://github.com/ethan-hawksley/nintendrust">Source Code</a>
     </footer>
+    <dialog id="controls-dialog">
+        <header id="controls-header">
+            <h2>Controls</h2>
+            <button id="controls-close">X</button>
+        </header>
+        <ul id="controls-list">
+            <li><span>A</span> <span>-</span> <span>Z Key</span></li>
+            <li><span>B</span> <span>-</span> <span>X Key</span></li>
+            <li><span>Select</span> <span>-</span> <span>Spacebar</span></li>
+            <li><span>Start</span> <span>-</span> <span>Enter Key</span></li>
+            <li><span>Up</span> <span>-</span> <span>Up Arrow</span></li>
+            <li><span>Down</span> <span>-</span> <span>Down Arrow</span></li>
+            <li><span>Left</span> <span>-</span> <span>Left Arrow</span></li>
+            <li><span>Right</span> <span>-</span> <span>Right Arrow</span></li>
+        </ul>
+    </dialog>
 </div>
 
 <script type="module">
   import init, {Emulator} from './pkg/nintendrust.js';
+
+  document.getElementById('controls').addEventListener('click', () => {
+    document.getElementById('controls-dialog').showModal();
+  });
+
+  document.getElementById('controls-close').addEventListener('click', () => {
+    document.getElementById('controls-dialog').close();
+  });
 
   let emu = null;
 
