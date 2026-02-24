@@ -1,4 +1,3 @@
-use image::ColorType::Rgb8;
 use minifb::{Key, Scale, Window, WindowOptions};
 use nintendrust::bus::Bus;
 use nintendrust::cpu::Cpu;
@@ -19,8 +18,6 @@ fn main() {
 
     let mut bus = Bus::new(rom);
     let mut cpu = Cpu::new();
-    let frame = bus.ppu.debug_draw_pattern_tables();
-    image::save_buffer("pattern_tables.png", &frame, 256, 128, Rgb8).expect("Failed to save image");
 
     cpu.reset(&mut bus);
 
@@ -71,17 +68,4 @@ fn main() {
             .update_with_buffer(&bus.ppu.frame_buffer, 256, 240)
             .unwrap();
     }
-
-    // for _ in 0..1000000 {
-    //     // println!("{}", cpu.trace(&bus));
-    //     cpu.emulate_cpu(&mut bus);
-    // }
-
-    // while !cpu.halted {
-    //     cpu.emulate_cpu(&mut bus);
-    // }
-
-    // let output_frame = bus.ppu.debug_draw_nametable();
-    // image::save_buffer("nametable.png", &output_frame, 512, 240, Rgb8)
-    //     .expect("Failed to save image");
 }
