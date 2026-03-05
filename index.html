@@ -80,12 +80,13 @@
         }
 
         #controls {
-            width: 3rem;
+            width: 5rem;
             height: 3rem;
         }
 
         #controls-dialog {
             padding: 2rem;
+            max-width: 24rem;
         }
 
         #controls-header {
@@ -136,15 +137,16 @@
         <button class="emulator-button" id="rom-button">Load local .nes NROM File</button>
         <input id="rom-input" type="file" accept=".nes">
         <button class="emulator-button" id="example-rom-button">Load Example ROM (Zooming&nbsp;Secretary)</button>
-        <button id="controls">?</button>
+        <button id="controls">Controls</button>
         <a href="https://hawksley.dev/">Home</a>
         <a href="https://github.com/ethan-hawksley/nintendrust">Source Code</a>
     </footer>
     <dialog id="controls-dialog">
         <header id="controls-header">
             <h2>Controls</h2>
-            <button id="controls-close">X</button>
+            <button id="controls-close">Close Popup</button>
         </header>
+        <p>The controls on the NES controller have been mapped to various keys.</p>
         <ul id="controls-list">
             <li><span>A</span> <span>-</span> <span>Z Key</span></li>
             <li><span>B</span> <span>-</span> <span>X Key</span></li>
@@ -155,6 +157,13 @@
             <li><span>Left</span> <span>-</span> <span>Left Arrow</span></li>
             <li><span>Right</span> <span>-</span> <span>Right Arrow</span></li>
         </ul>
+        <h2>How to play the example game</h2>
+        <p>Zooming Secretary is a community made game for the NES.</p>
+        <p>Your role is a secretary, fetching the information that the telephones require. The first level starts off
+            simple, but it quickly ramps up in difficulty as levels introduce obstructions such as your fellow office
+            workers.</p>
+        <p>Use the arrow keys to collect a topic from the filing
+            cabinets in the level, and then walk to the phone to drop them off!</p>
     </dialog>
 </div>
 
