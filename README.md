@@ -68,3 +68,7 @@ fn main() {
     // ...
 }
 ```
+
+## Author
+
+[Ethan Hawksley](https://hawksley.dev)
