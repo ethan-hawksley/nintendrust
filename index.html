@@ -1,291 +1,337 @@
 <!doctype html>
 <html lang="en-GB">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Nintendrust: Browser-Based NES Emulator | Ethan Hawksley</title>
-    <link rel="icon" type="image/svg+xml" href="https://hawksley.dev/favicon.svg?v=2">
-    <link rel="canonical" href="https://hawksley.dev/nintendrust/">
-    <meta name="description" content="Nintendrust, an online NES emulator by Ethan Hawksley. Supports all official NROM games.">
-    <meta name="author" content="Ethan Hawksley">
-    <meta property="og:title" content="Nintendrust: Browser-Based NES Emulator | Ethan Hawksley">
-    <meta property="og:description" content="Nintendrust, an online NES emulator by Ethan Hawksley. Supports all official NROM games.">
-    <meta property="og:site_name" content="Ethan Hawksley">
-    <meta property="og:locale" content="en_GB">
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://hawksley.dev/nintendrust/">
-    <meta property="og:image" content="https://hawksley.dev/og-image-1200x630-v2.png">
-    <meta property="og:image:alt" content="Ethan Hawksley | Software Developer &#38; CS Student">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
-    <meta property="og:image:type" content="image/png">
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:creator" content="@Ethan_Hawksley">
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="https://hawksley.dev/favicon.svg?v=2"
+    />
+    <link rel="canonical" href="https://hawksley.dev/nintendrust/" />
+    <meta
+      name="description"
+      content="Nintendrust, an online NES emulator by Ethan Hawksley. Supports all official NROM games."
+    />
+    <meta name="author" content="Ethan Hawksley" />
+    <meta
+      property="og:title"
+      content="Nintendrust: Browser-Based NES Emulator | Ethan Hawksley"
+    />
+    <meta
+      property="og:description"
+      content="Nintendrust, an online NES emulator by Ethan Hawksley. Supports all official NROM games."
+    />
+    <meta property="og:site_name" content="Ethan Hawksley" />
+    <meta property="og:locale" content="en_GB" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://hawksley.dev/nintendrust/" />
+    <meta
+      property="og:image"
+      content="https://hawksley.dev/og-image-1200x630-v2.png"
+    />
+    <meta
+      property="og:image:alt"
+      content="Ethan Hawksley | Software Developer &#38; CS Student"
+    />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:type" content="image/png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:creator" content="@Ethan_Hawksley" />
     <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "WebApplication",
-      "name": "Nintendrust",
-      "author": {
-        "@type": "Person",
-        "@id": "https://hawksley.dev/#person",
-        "name": "Ethan Hawksley",
-        "url": "https://hawksley.dev/"
-      },
-      "url": "https://hawksley.dev/nintendrust/",
-      "applicationCategory": "GameApplication",
-      "operatingSystem": "Any"
-    }
+        {
+            "@context": "https://schema.org",
+            "@type": "WebApplication",
+            "@id": "https://hawksley.dev/#project-nintendrust",
+            "url": "https://hawksley.dev/nintendrust/",
+            "name": "Nintendrust",
+            "description": "A browser-based NES emulator built with Rust and WebAssembly, ported from a C# WinForms desktop architecture. Implements the full 6502 instruction set, NROM mapper support, and a scanline-accurate PPU with sprite evaluation.",
+            "creator": {
+                "@type": "Person",
+                "@id": "https://hawksley.dev/#person",
+                "name": "Ethan Hawksley",
+                "url": "https://hawksley.dev/"
+            },
+            "hasPart": {
+                "@type": "SoftwareSourceCode",
+                "codeRepository": "https://github.com/ethan-hawksley/nintendrust"
+            },
+            "applicationCategory": "GameApplication",
+            "operatingSystem": "Any",
+            "offers": {
+                "@type": "Offer",
+                "price": 0,
+                "priceCurrency": "GBP"
+            },
+            "sameAs": "https://github.com/ethan-hawksley/nintendrust"
+        }
     </script>
     <style>
-        * {
-            box-sizing: border-box;
-            padding: 0;
-        }
+      * {
+        box-sizing: border-box;
+        padding: 0;
+      }
 
-        *:not(dialog) {
-            margin: 0;
-        }
+      *:not(dialog) {
+        margin: 0;
+      }
 
-        body {
-            color: #fff;
-            background-color: #222;
-            font-family: system-ui, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-            height: 100dvh;
-            overflow: hidden;
-        }
+      body {
+        color: #fff;
+        background-color: #222;
+        font-family: system-ui, sans-serif;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+        height: 100dvh;
+        overflow: hidden;
+      }
 
-        #app {
-            display: flex;
-            gap: 0.5rem;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-            height: 100%;
-            margin: 1rem;
-        }
+      #app {
+        display: flex;
+        gap: 0.5rem;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+        height: 100%;
+        margin: 1rem;
+      }
 
-        footer {
-            display: flex;
-            justify-content: center;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 1rem;
-        }
+      footer {
+        display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 1rem;
+      }
 
-        button {
-            color: inherit;
-            background: inherit;
-            transition: border-color 250ms ease-out;
-        }
+      button {
+        color: inherit;
+        background: inherit;
+        transition: border-color 250ms ease-out;
+      }
 
+      button:hover {
+        border-color: #ff4f00;
+      }
 
-        button:hover {
-            border-color: #ff4f00;
-        }
+      .emulator-button {
+        width: 9rem;
+        height: 3rem;
+      }
 
-        .emulator-button {
-            width: 9rem;
-            height: 3rem;
-        }
+      #controls {
+        width: 5rem;
+        height: 3rem;
+      }
 
-        #controls {
-            width: 5rem;
-            height: 3rem;
-        }
+      #controls-dialog {
+        padding: 2rem;
+        max-width: 24rem;
+      }
 
-        #controls-dialog {
-            padding: 2rem;
-            max-width: 24rem;
-        }
+      #controls-header {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 1rem;
+      }
 
-        #controls-header {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 1rem;
-        }
+      #controls-list li {
+        display: grid;
+        grid-template-columns: 3.5rem 1rem 1fr;
+      }
 
-        #controls-list li {
-            display: grid;
-            grid-template-columns: 3.5rem 1rem 1fr;
-        }
+      a {
+        padding: 1rem 0.5rem 1rem 0.5rem;
+        margin-left: -0.5rem;
+        margin-right: -0.5rem;
+        color: inherit;
+        transition: color 250ms ease-out;
+      }
 
-        a {
-            padding: 1rem 0.5rem 1rem 0.5rem;
-            margin-left: -0.5rem;
-            margin-right: -0.5rem;
-            color: inherit;
-            transition: color 250ms ease-out;
-        }
+      a:hover {
+        color: #ff4f00;
+      }
 
-        a:hover {
-            color: #ff4f00;
-        }
+      #rom-input {
+        display: none;
+      }
 
-        #rom-input {
-            display: none;
-        }
-
-        canvas {
-            max-width: 100%;
-            height: 100%;
-            flex-grow: 1;
-            image-rendering: pixelated;
-            background: #000;
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
-            aspect-ratio: 256/240;
-        }
+      canvas {
+        max-width: 100%;
+        height: 100%;
+        flex-grow: 1;
+        image-rendering: pixelated;
+        background: #000;
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+        aspect-ratio: 256/240;
+      }
     </style>
-</head>
-<body>
-<div id="app">
-    <h1>Nintendrust</h1>
-    <p>A browser-based NES emulator built with Rust and
-        WebAssembly. Load an NROM .nes file to play.</p>
-    <canvas id="screen" width="256" height="240"></canvas>
-    <footer>
-        <button class="emulator-button" id="rom-button">Load local .nes NROM File</button>
-        <input id="rom-input" type="file" accept=".nes">
-        <button class="emulator-button" id="example-rom-button">Load Example ROM (Zooming&nbsp;Secretary)</button>
+  </head>
+  <body>
+    <div id="app">
+      <h1>Nintendrust</h1>
+      <p>
+        A browser-based NES emulator built with Rust and WebAssembly. Load an
+        NROM .nes file to play.
+      </p>
+      <canvas id="screen" width="256" height="240"></canvas>
+      <footer>
+        <button class="emulator-button" id="rom-button">
+          Load local .nes NROM File
+        </button>
+        <input id="rom-input" type="file" accept=".nes" />
+        <button class="emulator-button" id="example-rom-button">
+          Load Example ROM (Zooming&nbsp;Secretary)
+        </button>
         <button id="controls">Controls</button>
         <a href="https://hawksley.dev/">Home</a>
         <a href="https://github.com/ethan-hawksley/nintendrust">Source Code</a>
-    </footer>
-    <dialog id="controls-dialog">
+      </footer>
+      <dialog id="controls-dialog">
         <header id="controls-header">
-            <h2>Controls</h2>
-            <button id="controls-close">Close Popup</button>
+          <h2>Controls</h2>
+          <button id="controls-close">Close Popup</button>
         </header>
-        <p>The controls on the NES controller have been mapped to various keys.</p>
+        <p>
+          The controls on the NES controller have been mapped to various keys.
+        </p>
         <ul id="controls-list">
-            <li><span>A</span> <span>-</span> <span>Z Key</span></li>
-            <li><span>B</span> <span>-</span> <span>X Key</span></li>
-            <li><span>Select</span> <span>-</span> <span>Spacebar</span></li>
-            <li><span>Start</span> <span>-</span> <span>Enter Key</span></li>
-            <li><span>Up</span> <span>-</span> <span>Up Arrow</span></li>
-            <li><span>Down</span> <span>-</span> <span>Down Arrow</span></li>
-            <li><span>Left</span> <span>-</span> <span>Left Arrow</span></li>
-            <li><span>Right</span> <span>-</span> <span>Right Arrow</span></li>
+          <li><span>A</span> <span>-</span> <span>Z Key</span></li>
+          <li><span>B</span> <span>-</span> <span>X Key</span></li>
+          <li><span>Select</span> <span>-</span> <span>Spacebar</span></li>
+          <li><span>Start</span> <span>-</span> <span>Enter Key</span></li>
+          <li><span>Up</span> <span>-</span> <span>Up Arrow</span></li>
+          <li><span>Down</span> <span>-</span> <span>Down Arrow</span></li>
+          <li><span>Left</span> <span>-</span> <span>Left Arrow</span></li>
+          <li><span>Right</span> <span>-</span> <span>Right Arrow</span></li>
         </ul>
         <h2>How to play the example game</h2>
         <p>Zooming Secretary is a community made game for the NES.</p>
-        <p>Your role is a secretary, fetching the information that the telephones require. The first level starts off
-            simple, but it quickly ramps up in difficulty as levels introduce obstructions such as your fellow office
-            workers.</p>
-        <p>Use the arrow keys to collect a topic from the filing
-            cabinets in the level, and then walk to the phone to drop them off!</p>
-    </dialog>
-</div>
+        <p>
+          Your role is a secretary, fetching the information that the telephones
+          require. The first level starts off simple, but it quickly ramps up in
+          difficulty as levels introduce obstructions such as your fellow office
+          workers.
+        </p>
+        <p>
+          Use the arrow keys to collect a topic from the filing cabinets in the
+          level, and then walk to the phone to drop them off!
+        </p>
+      </dialog>
+    </div>
 
-<script type="module">
-  import init, {Emulator} from './pkg/nintendrust.js';
+    <script type="module">
+      import init, { Emulator } from "./pkg/nintendrust.js";
 
-  document.getElementById('controls').addEventListener('click', () => {
-    document.getElementById('controls-dialog').showModal();
-  });
+      document.getElementById("controls").addEventListener("click", () => {
+        document.getElementById("controls-dialog").showModal();
+      });
 
-  document.getElementById('controls-close').addEventListener('click', () => {
-    document.getElementById('controls-dialog').close();
-  });
+      document
+        .getElementById("controls-close")
+        .addEventListener("click", () => {
+          document.getElementById("controls-dialog").close();
+        });
 
-  let emu = null;
+      let emu = null;
 
-  // NES Controller Mapping
-  const KEY_MAP = {
-    'KeyZ': 0x80, // A
-    'KeyX': 0x40, // B
-    'Space': 0x20, // Select
-    'Enter': 0x10, // Start
-    'ArrowUp': 0x08, // Up
-    'ArrowDown': 0x04, // Down
-    'ArrowLeft': 0x02, // Left
-    'ArrowRight': 0x01  // Right
-  };
+      // NES Controller Mapping
+      const KEY_MAP = {
+        KeyZ: 0x80, // A
+        KeyX: 0x40, // B
+        Space: 0x20, // Select
+        Enter: 0x10, // Start
+        ArrowUp: 0x08, // Up
+        ArrowDown: 0x04, // Down
+        ArrowLeft: 0x02, // Left
+        ArrowRight: 0x01, // Right
+      };
 
-  let joypadState = 0;
+      let joypadState = 0;
 
-  window.addEventListener('keydown', e => {
-    // Lookup the key code in the map
-    if (KEY_MAP[e.code] !== undefined) {
-      e.preventDefault();
-      joypadState |= KEY_MAP[e.code];
-    }
-  });
+      window.addEventListener("keydown", (e) => {
+        // Lookup the key code in the map
+        if (KEY_MAP[e.code] !== undefined) {
+          e.preventDefault();
+          joypadState |= KEY_MAP[e.code];
+        }
+      });
 
-  window.addEventListener('keyup', e => {
-    // Lookup the key code in the map
-    if (KEY_MAP[e.code] !== undefined) {
-      e.preventDefault();
-      joypadState &= ~KEY_MAP[e.code];
-    }
-  });
+      window.addEventListener("keyup", (e) => {
+        // Lookup the key code in the map
+        if (KEY_MAP[e.code] !== undefined) {
+          e.preventDefault();
+          joypadState &= ~KEY_MAP[e.code];
+        }
+      });
 
-  const romButton = document.getElementById('rom-button');
-  const romInput = document.getElementById('rom-input');
-  romButton.addEventListener('click', () => {
-    romInput.click();
-  });
+      const romButton = document.getElementById("rom-button");
+      const romInput = document.getElementById("rom-input");
+      romButton.addEventListener("click", () => {
+        romInput.click();
+      });
 
-  romInput.addEventListener('change', async () => {
-    const file = romInput.files[0];
-    if (file) {
-      // Convert file to URL for the emulator
-      const objectUrl = URL.createObjectURL(file);
-      await run(objectUrl).catch(console.error);
-      // Clear the memory after it is finished
-      URL.revokeObjectURL(objectUrl);
-    }
-  });
+      romInput.addEventListener("change", async () => {
+        const file = romInput.files[0];
+        if (file) {
+          // Convert file to URL for the emulator
+          const objectUrl = URL.createObjectURL(file);
+          await run(objectUrl).catch(console.error);
+          // Clear the memory after it is finished
+          URL.revokeObjectURL(objectUrl);
+        }
+      });
 
-  document.getElementById('example-rom-button').addEventListener('click', async () => {
-    await run('Zooming_Secretary.nes').catch(console.error);
-  });
+      document
+        .getElementById("example-rom-button")
+        .addEventListener("click", async () => {
+          await run("Zooming_Secretary.nes").catch(console.error);
+        });
 
-  async function run(url) {
-    // Load the Wasm module
-    await init();
+      async function run(url) {
+        // Load the Wasm module
+        await init();
 
-    // Fetch ROM file
-    const romResponse = await fetch(url);
-    const romBuffer = await romResponse.arrayBuffer();
+        // Fetch ROM file
+        const romResponse = await fetch(url);
+        const romBuffer = await romResponse.arrayBuffer();
 
-    // Initialize the Emulator with the ROM bytes
-    const active = emu !== null;
-    if (emu) {
-      emu.free();
-    }
-    emu = new Emulator(new Uint8Array(romBuffer));
+        // Initialize the Emulator with the ROM bytes
+        const active = emu !== null;
+        if (emu) {
+          emu.free();
+        }
+        emu = new Emulator(new Uint8Array(romBuffer));
 
-    const canvas = document.getElementById('screen');
-    const ctx = canvas.getContext('2d');
-    const imageData = ctx.createImageData(256, 240);
+        const canvas = document.getElementById("screen");
+        const ctx = canvas.getContext("2d");
+        const imageData = ctx.createImageData(256, 240);
 
+        // The main emulation loop
+        function loop() {
+          // Send inputs to Rust
+          emu.set_input(joypadState);
 
-    // The main emulation loop
-    function loop() {
-      // Send inputs to Rust
-      emu.set_input(joypadState);
+          // Emulate one frame
+          emu.step_frame();
 
-      // Emulate one frame
-      emu.step_frame();
+          // Get the pixel data and draw it to the Canvas
+          const pixels = emu.get_pixels();
+          imageData.data.set(pixels);
+          ctx.putImageData(imageData, 0, 0);
 
-      // Get the pixel data and draw it to the Canvas
-      const pixels = emu.get_pixels();
-      imageData.data.set(pixels);
-      ctx.putImageData(imageData, 0, 0);
+          // Queue next frame
+          requestAnimationFrame(loop);
+        }
 
-      // Queue next frame
-      requestAnimationFrame(loop);
-    }
-
-    if (!active) {
-      loop();
-    }
-  }
-</script>
-</body>
+        if (!active) {
+          loop();
+        }
+      }
+    </script>
+  </body>
 </html>
