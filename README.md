@@ -23,7 +23,7 @@ cargo install wasm-pack
 Clone the repository locally.
 
 ```shell
-git clone https://github.com/ethan-hawksley/nintendrust
+git clone https://github.com/ethanhawksley/nintendrust
 cd nintendrust
 ```
 
@@ -48,7 +48,7 @@ Ensure you have the Cargo package manager installed. If you are missing it, you 
 Clone the repository locally.
 
 ```shell
-git clone https://github.com/ethan-hawksley/nintendrust
+git clone https://github.com/ethanhawksley/nintendrust
 cd nintendrust
 git checkout native
 ```
