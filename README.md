@@ -12,7 +12,7 @@ The program can be found running at https://hawksley.dev/nintendrust/
 
 Alternatively, you can run the program locally, or deploy to a hosting site like GitHub Pages.
 
-Ensure you have the Cargo package manager installed. If you are missing it, you can download it through [rustup](https://rustup.rs/). 
+Ensure you have the Cargo package manager installed. If you are missing it, you can download it through [rustup](https://rustup.rs/).
 
 Then, install the `wasm-pack` crate.
 
@@ -43,7 +43,7 @@ The program is now available to visit in your browser!
 
 ### Running the desktop version
 
-Ensure you have the Cargo package manager installed. If you are missing it, you can download it through [rustup](https://rustup.rs/). 
+Ensure you have the Cargo package manager installed. If you are missing it, you can download it through [rustup](https://rustup.rs/).
 
 Clone the repository locally.
 
