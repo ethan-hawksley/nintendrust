@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en-GB">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -7,9 +7,9 @@
     <link
       rel="icon"
       type="image/svg+xml"
-      href="https://hawksley.dev/favicon.svg?v=2"
+      href="https://hawksley.dev/icon.svg"
     />
-    <link rel="canonical" href="https://hawksley.dev/nintendrust/" />
+    <link rel="canonical" href="https://nintendrust.hawksley.dev/" />
     <meta
       name="description"
       content="Nintendrust, an online NES emulator by Ethan Hawksley. Supports all official NROM games."
@@ -26,46 +26,26 @@
     <meta property="og:site_name" content="Ethan Hawksley" />
     <meta property="og:locale" content="en_GB" />
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://hawksley.dev/nintendrust/" />
-    <meta
-      property="og:image"
-      content="https://hawksley.dev/og-image-1200x630-v2.png"
-    />
-    <meta
-      property="og:image:alt"
-      content="Ethan Hawksley | Software Developer &#38; CS Student"
-    />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
-    <meta property="og:image:type" content="image/png" />
-    <meta name="twitter:card" content="summary_large_image" />
+    <meta property="og:url" content="https://nintendrust.hawksley.dev/" />
     <meta name="twitter:creator" content="@Ethan_Hawksley" />
     <script type="application/ld+json">
         {
-            "@context": "https://schema.org",
-            "@type": "WebApplication",
-            "@id": "https://hawksley.dev/#project-nintendrust",
-            "url": "https://hawksley.dev/nintendrust/",
-            "name": "Nintendrust",
-            "description": "A browser-based NES emulator built with Rust and WebAssembly, ported from a C# WinForms desktop architecture. Implements the full 6502 instruction set, NROM mapper support, and a scanline-accurate PPU with sprite evaluation.",
-            "creator": {
-                "@type": "Person",
-                "@id": "https://hawksley.dev/#person",
-                "name": "Ethan Hawksley",
-                "url": "https://hawksley.dev/"
-            },
-            "hasPart": {
-                "@type": "SoftwareSourceCode",
-                "codeRepository": "https://github.com/ethan-hawksley/nintendrust"
-            },
-            "applicationCategory": "GameApplication",
-            "operatingSystem": "Any",
-            "offers": {
-                "@type": "Offer",
-                "price": 0,
-                "priceCurrency": "GBP"
-            },
-            "sameAs": "https://github.com/ethan-hawksley/nintendrust"
+          "@context": "https://schema.org",
+          "@type": "WebApplication",
+          "@id": "https://nintendrust.hawksley.dev/#app",
+          "url": "https://nintendrust.hawksley.dev/",
+          "name": "Nintendrust",
+          "description": "A browser-based NES emulator built with Rust and WebAssembly, ported from a C# WinForms desktop architecture. Implements the full 6502 instruction set, NROM mapper support, and a scanline-accurate PPU with sprite evaluation.",
+          "applicationCategory": "GameApplication",
+          "creator": {
+            "@type": "Person",
+            "@id": "https://hawksley.dev/#person",
+            "name": "Ethan Hawksley",
+            "url": "https://hawksley.dev/"
+          },
+          "sameAs": [
+            "https://github.com/ethanhawksley/nintendrust"
+          ]
         }
     </script>
     <style>
@@ -188,7 +168,7 @@
           Load Example ROM (Zooming&nbsp;Secretary)
         </button>
         <button id="controls">Controls</button>
-        <a href="https://hawksley.dev/">Home</a>
+        <a href="https://hawksley.dev/">hawksley.dev</a>
         <a href="https://github.com/ethan-hawksley/nintendrust">Source Code</a>
       </footer>
       <dialog id="controls-dialog">
