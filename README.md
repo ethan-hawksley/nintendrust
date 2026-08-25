@@ -8,7 +8,7 @@ On this repository there are two branches. The `main` branch contains the code f
 
 ### Running the web version
 
-The program can be found running at https://hawksley.dev/nintendrust/
+The program can be found running at https://nintendrust.hawksley.dev/
 
 Alternatively, you can run the program locally, or deploy to a hosting site like GitHub Pages.
 
@@ -71,4 +71,4 @@ fn main() {
 
 ## Author
 
-[Ethan Hawksley](https://hawksley.dev)
+Made by [Ethan Hawksley](https://hawksley.dev)
